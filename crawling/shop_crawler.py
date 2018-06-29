@@ -126,8 +126,7 @@ class ShopCrawler:
             return url
         return 'http://' + url
 
-    @staticmethod
-    def create_driver():
+    def create_driver(self):
         options = webdriver.ChromeOptions()
         if self._headless:
             options.add_argument('--headless')
@@ -169,7 +168,7 @@ class ShopCrawler:
 
     def crawl(self, url, wait_response_seconds = 20):
         url = ShopCrawler.normalize_url(url)
-        driver = ShopCrawler.create_driver()
+        driver = self.create_driver()
         
         try:
             driver.implicitly_wait(wait_response_seconds)  # seconds
