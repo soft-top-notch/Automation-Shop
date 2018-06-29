@@ -1,6 +1,6 @@
 import os
 import csv
-import time
+import time, threading
 import random
 from random import choice
 from builtwith import builtwith
@@ -11,7 +11,8 @@ from requests.exceptions import ConnectionError
 class Statistics:
 	"""docstring for Statistics"""
 	result = {}
-	total_count = 100
+	total_count = 500
+	total_prev_count = 500
 	urls = []
 
 	def __init__(self, result, file_url, user_agents=None, proxy=None):
@@ -51,22 +52,22 @@ class Statistics:
 			)
 			response.raise_for_status()
 		except requests.HTTPError as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		except requests.ConnectionError as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		except requests.ReadTimeout as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		except requests.exceptions.SSLError as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		except requests.exceptions.ChunkedEncodingError as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		except requests.exceptions.ConnectTimeout as e:
-			print('-----Error Request--------', e)
+			print('-----Error Request--------: ', e)
 			return {'status': 800}
 		else:
 			return {'response': response, 'status': 200}
@@ -74,7 +75,7 @@ class Statistics:
 	def update_result(self, item):
 		if item in self.result['first']:
 			percent_num = self.result['second'][self.result['headToindex'][item]].split('%')[0]
-			self.result['second'][self.result['headToindex'][item]] = str((float(percent_num) + 100 / self.total_count)) + '%'
+			self.result['second'][self.result['headToindex'][item]] = str(float(percent_num) * self.total_prev_count / self.total_count + 100 / self.total_count) + '%'
 		else:
 			self.result['first'].append(item)
 			self.result['second'].append(str(100 / self.total_count) + '%')
@@ -85,11 +86,10 @@ class Statistics:
 
 	def get_result(self):
 		try:
-			print("---------urls---------------")
-			print(self.urls)
 			for url in self.urls:
 				response = self.__request_url(url)
 				if response['status'] != 200:
+					self.total_count -= 1
 					continue
 				print(response['response'])
 				technologies = builtwith(url, response['response'].headers, response['response'].text, 'builtwith')
@@ -99,6 +99,7 @@ class Statistics:
 						self.update_result(item)
 				else:
 					self.update_result('Unknown')
+				self.total_prev_count = self.total_count
 				print("--------url--------------")
 				print(url)
 				print("-------------")
