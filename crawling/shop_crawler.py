@@ -1,4 +1,5 @@
 import logging
+import traceback
 from abc import ABCMeta, abstractmethod
 from selenium import webdriver
 import sys
@@ -141,6 +142,7 @@ class ShopCrawler:
         options.add_argument("--disable-save-password-bubble")
 
         driver = webdriver.Chrome(self._chrome_path, chrome_options=options)
+        driver.set_page_load_timeout(60)
         
         return driver
     
@@ -193,7 +195,9 @@ class ShopCrawler:
                     return False
 
                 state = new_state
-
+        except:
+            print("Unexpected error:", traceback.format_exc())
+            return False
         finally:
             driver.quit()
 
