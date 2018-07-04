@@ -4,20 +4,8 @@ from abc import ABCMeta, abstractmethod
 from selenium import webdriver
 import sys
 import time
-
-
-class Frame:
-    def __init__(self, driver, frame=None):
-        self.driver = driver
-        self.frame = frame
-
-    def __enter__(self):
-        if self.frame:
-            self.driver.switch_to.frame(self.frame)
-
-    def __exit__(self, type, value, traceback):
-        if self.frame:
-            self.driver.switch_to.default_content()
+from selenium.webdriver.common.keys import Keys
+from selenium_helper import *
 
 
 class States:
@@ -72,16 +60,17 @@ class PaymentInfo:
 
 
 class StepContext:
-    def __init__(self, user_info, payment_info):
+    def __init__(self, domain, user_info, payment_info):
         self.user_info = user_info
         self.payment_info = payment_info
+        self.domain = domain
 
 
 class IStepActor:
 
     @abstractmethod
     def filter_page(self, driver, state, context):
-        raise NotImplementedError
+        return True
 
     @abstractmethod
     def process_page(self, driver, state, context):
@@ -113,8 +102,18 @@ class ShopCrawler:
         self._user_info = user_info
         self._payment_info = payment_info
         self._chrome_path = chrome_path
-        self._logger = logging.getLogger('PageHandler')
+        self._logger = logging.getLogger('shop_crawler')
         self._headless = headless
+        self._driver = None
+        
+        
+    def __enter__(self):
+        pass
+    
+    def __exit__(self, type, value, traceback):
+        if self._driver:
+            self._driver.quit()
+            
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -127,39 +126,35 @@ class ShopCrawler:
             return url
         return 'http://' + url
 
-    def create_driver(self):
-        options = webdriver.ChromeOptions()
-        if self._headless:
-            options.add_argument('--headless')
-
-        options.add_argument("--disable-infobars")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-notifications")
-        options.add_argument("--start-maximized")
-        options.add_argument("--disable-web-security")
-        options.add_argument("--no-proxy-server")
-        options.add_argument("--enable-automation")
-        options.add_argument("--disable-save-password-bubble")
-
-        driver = webdriver.Chrome(self._chrome_path, chrome_options=options)
+    def get_driver(self):
+        if self._driver:
+            num_of_tabs = count_tabs(self._driver)
+            for x in range(1, num_of_tabs):
+                close_tab(self._driver)
+            
+            return self._driver
+        
+        driver = create_chrome_driver(self._chrome_path, self._headless)
         driver.set_page_load_timeout(60)
+        
+        self._driver = driver
         
         return driver
     
-    def process_state(self, driver, state):
-        context = StepContext(self._user_info, self._payment_info)
+    def process_state(self, driver, state, context):
 
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
 
         handlers.sort(key=lambda p: -p[0])
 
-        print('processing state: {}'.format(state))
+        self._logger.info('processing state: {}'.format(state))
 
         for priority, handler in handlers:
-            print('handler {}'.format(handler))
+            
+            self._logger.info('handler {}'.format(handler))
             new_state = handler.act(driver, state, context)
-            print('new_state {}, url {}'.format(new_state, driver.current_url))
+            self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
 
             assert new_state is not None, "new_state is None"
 
@@ -168,9 +163,11 @@ class ShopCrawler:
 
         return state
 
-    def crawl(self, url, wait_response_seconds = 20):
-        url = ShopCrawler.normalize_url(url)
-        driver = self.create_driver()
+    def crawl(self, domain, wait_response_seconds = 20):
+        url = ShopCrawler.normalize_url(domain)
+        context = StepContext(domain, self._user_info, self._payment_info)
+
+        driver = self.get_driver()
         
         try:
             driver.implicitly_wait(wait_response_seconds)  # seconds
@@ -184,21 +181,19 @@ class ShopCrawler:
 
                 for frame in frames:
                     with Frame(driver, frame):
-                        new_state = self.process_state(driver, state)
+                        new_state = self.process_state(driver, state, context)
                         if new_state != state:
                             break
 
                 if state == new_state:
-                    print("Didn't manage to finish site: {} stopped at state: {}, current url: {}"
-                          .format(url, state, driver.current_url))
+                    self._logger.info("Can't purchase from shop: {} stopped at state: {}, current url: {}".format(
+                          url, state, driver.current_url))
 
                     return False
 
                 state = new_state
         except:
-            print("Unexpected error:", traceback.format_exc())
+            self._logger.exception("Unexpected exception during processing {}".format(url))
             return False
-        finally:
-            driver.quit()
-
+        
         return True

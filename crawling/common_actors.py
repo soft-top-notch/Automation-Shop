@@ -1,4 +1,5 @@
 from shop_crawler import *
+from selenium_helper import *
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -7,6 +8,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import WebDriverException
 
 import sys
 import re
@@ -52,9 +54,11 @@ def can_click(element):
     try:
         element.is_enabled();
         return element.is_displayed()
-    except:
+    except WebDriverException:
+        logger = logging.getLogger('shop_crawler')
+        logger.debug('Exception during checking element {}'.format(traceback.format_exc()))
         return False
-
+        
 
 def find_links(driver, contains=None, not_contains=None, by_path=False):
     links = driver.find_elements_by_css_selector("a[href]")
@@ -81,9 +85,10 @@ def find_links(driver, contains=None, not_contains=None, by_path=False):
 
 def find_buttons_or_links(driver,
                           contains=None,
-                          not_contains=None):
+                          not_contains=None
+                         ):
     links = driver.find_elements_by_css_selector("a[href]")
-    buttons = driver.find_elements_by_css_selector("button")
+    buttons = driver.find_elements_by_tag_name("button")
     inputs = driver.find_elements_by_css_selector('input[type="button"]')
     submits = driver.find_elements_by_css_selector('input[type="submit"]')
 
@@ -99,6 +104,12 @@ def find_buttons_or_links(driver,
 
     return result
 
+def to_string(element):
+    try:
+        return element.get_attribute('outerHTML')
+    except:
+        return str(element)
+
 
 def click_first(driver, elements, on_error=None):
     def process(element):
@@ -108,9 +119,6 @@ def click_first(driver, elements, on_error=None):
             if href and driver.current_url != href:
                 driver.get(href)
                 return True
-
-            actions = ActionChains(driver)
-            actions.move_to_element(element).perform()
 
             ActionChains(driver).move_to_element(element).perform()
 
@@ -122,12 +130,19 @@ def click_first(driver, elements, on_error=None):
                 driver.switch_to_window(driver.window_handles[-1])
 
             return True
-        except:
-            print("Unexpected error:", traceback.format_exc())
+        
+        except WebDriverException:
+            logger = logging.getLogger('shop_crawler')
+            logger.debug('Unexpected exception during clicking element {}'.format(traceback.format_exc()))
             return False
 
+    logger = logging.getLogger('shop_crawler')
+            
     for element in elements:
-        if process(element):
+        clicked = process(element)
+        logger.debug('clicking, result = {}, element = {}'.format(clicked, to_string(element)))
+                     
+        if clicked:
             return True
 
         if on_error and on_error(driver):
@@ -138,20 +153,18 @@ def click_first(driver, elements, on_error=None):
 
 
 def try_handle_popups(driver):
-    btns = find_buttons_or_links(driver, ["i .*over", "i .*age", "i agree"], [' .*not.*', " .*under.*"])
+    btns = find_buttons_or_links(driver, ["i .*over", "i .*age", ".* agree .*"], [' .*not.*', " .*under.*"])
     return click_first(driver, btns)
 
+def tokenize(text):
+    return re.split(r'(\d+|\W+)', text)
 
-class ToProductPage(IStepActor):
+class ToProductPageLink(IStepActor):
     def get_states(self):
         return [States.new, States.shop]
 
     def find_to_product_links(self, driver):
         return find_links(driver, ['/product', '/commodity', '/drug'], by_path=True)
-
-    def filter_page(self, driver, state, context):
-        links = self.find_to_product_links(driver)
-        return len(links) > 0
 
     def process_page(self, driver, state, context):
         links = self.find_to_product_links(driver)
@@ -165,14 +178,20 @@ class AddToCart(IStepActor):
     def get_states(self):
         return [States.new, States.shop, States.product_page]
 
+    def filter_button(self, button):
+        text = button.get_attribute('innerHTML')
+        words = tokenize(text)
+        if 'buy' in words:
+            return len(words) <= 2
+        
+        return True
+        
     def find_to_cart_elements(self, driver):
-        return find_buttons_or_links(driver, ["add.*to.*cart",
-                                              "add.*to.*bag"
+        btns = find_buttons_or_links(driver, ["add to cart",
+                                              "add to bag",
+                                              "buy"
                                               ])
-
-    def filter_page(self, driver, state, content):
-        elements = self.find_to_cart_elements(driver)
-        return len(elements) > 0
+        return list([btn for btn in btns if self.filter_button(btn)])
 
     def process_page(self, driver, state, context):
         elements = self.find_to_cart_elements(driver)
@@ -182,42 +201,17 @@ class AddToCart(IStepActor):
             return state
 
 
-class ToShop(IStepActor):
+class ToShopLink(IStepActor):
     def get_states(self):
         return [States.new]
 
     def find_to_shop_elements(self, driver):
         return find_buttons_or_links(driver, ["shop", "store", "products"], ["shops", "stores"])
 
-    def filter_page(self, driver, state, context):
-        elements = self.find_to_shop_elements(driver)
-        return len(elements) > 0
-
     def process_page(self, driver, state, context):
         elements = self.find_to_shop_elements(driver)
         if click_first(driver, elements, try_handle_popups):
             return States.shop
-        else:
-            return state
-
-
-class ToCart(IStepActor):
-
-    def find_to_cart_elements(self, driver):
-        return find_buttons_or_links(driver, ["cart"], ['add', 'append'])
-
-    def get_states(self):
-        return [States.product_in_cart]
-
-    def filter_page(self, driver, state, context):
-        btns = self.find_to_cart_elements(driver)
-        return len(btns) > 0
-
-    def process_page(self, driver, state, context):
-        btns = self.find_to_cart_elements(driver)
-
-        if click_first(driver, btns):
-            return States.cart_page
         else:
             return state
 
@@ -228,10 +222,6 @@ class ToCartLink(IStepActor):
 
     def get_states(self):
         return [States.product_in_cart]
-
-    def filter_page(self, driver, state, context):
-        btns = self.find_to_cart_links(driver)
-        return len(btns) > 0
 
     def process_page(self, driver, state, context):
         btns = self.find_to_cart_links(driver)
@@ -250,10 +240,6 @@ class ToCheckout(IStepActor):
     def get_states(self):
         return [States.product_in_cart, States.cart_page]
 
-    def filter_page(self, driver, state, context):
-        btns = self.find_checkout_elements(driver)
-        return len(btns) > 0
-
     def process_page(self, driver, state, context):
         btns = self.find_checkout_elements(driver)
 
@@ -262,15 +248,57 @@ class ToCheckout(IStepActor):
         else:
             return state
 
+    
+class GoogleForProductPage(IStepActor):
+    def get_states(self):
+        return [States.new, States.shop, States.product_page]
+        
+    def search(self, driver, google_query):
+        driver.get('http://google.com')
+        search_input = driver.find_element_by_css_selector('input.gsfi')
+        search_input.clear()
+        search_input.send_keys(google_query)
+        search_input.send_keys(Keys.ENTER)
+        
+        links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
+        if len(links) > 0:
+            return links[0].get_attribute("href")
+        else:
+            return None
+    
+    def search_for_product_link(self, driver, domain):
+        queries = ['add to cart']
 
+        # Open a new tab
+        new_tab(driver)
+        driver.get('https://google.com')
+        for query in queries:
+            google_query = 'site:{} {}'.format(domain, query)
+            link = self.search(driver, google_query)
+            if link:
+                break
+        
+        # Close new tab
+        close_tab(driver)
+        
+        return link
+    
+    def process_page(self, driver, state, context):
+        link = self.search_for_product_link(driver, context.domain)
+        
+        if link:
+            url = ShopCrawler.normalize_url(link)
+            driver.get(url)
+            return States.product_page
+        
+        return state
+    
+       
 def add_crawler_extensions(crawler):
-    common_actors = [
-        (3, AddToCart()),
-        (2, ToProductPage()),
-        (1, ToShop()),
-        (3, ToCheckout()),
-        (2, ToCartLink())
-    ]
-
-    for priority, handler in common_actors:
-        crawler.add_handler(handler, priority)
+    crawler.add_handler(AddToCart(), 4)
+    crawler.add_handler(GoogleForProductPage(), 3)
+    crawler.add_handler(ToProductPageLink(), 2)
+    crawler.add_handler(ToShopLink(), 1)
+    crawler.add_handler(ToCheckout(), 3)
+    crawler.add_handler(ToCartLink(), 2)
+    
