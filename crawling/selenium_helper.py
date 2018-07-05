@@ -1,5 +1,5 @@
 from selenium import webdriver
-
+from bs4 import BeautifulSoup
 
 class Frame:
     def __init__(self, driver, frame=None):
@@ -15,6 +15,16 @@ class Frame:
             self.driver.switch_to.default_content()
 
 
+def get_page_text(driver):
+    html = driver.page_source
+    soup = BeautifulSoup(html)
+    
+    for script in soup(["script", "style", "img", "input"]):
+        script.decompose()
+    
+    return soup.get_text()
+
+            
 def count_tabs(driver):
     return len(driver.window_handles)
 

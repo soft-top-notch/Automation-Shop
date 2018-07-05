@@ -1,5 +1,6 @@
 from shop_crawler import *
 from selenium_helper import *
+import nlp
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -15,39 +16,9 @@ import re
 import traceback
 
 
-def normalize_text(text):
-    # ToDo Proper normalization
-    return text.replace('-', ' ') \
-        .replace('_', ' ') \
-        .replace('  ', ' ')
-
-
-def check_text(text, contains, not_contains, normalize=True):
-    if not contains:
-        contains = []
-
-    if not not_contains:
-        not_contains = []
-
-    if normalize:
-        text = normalize_text(text)
-
-    has_searched = False
-    for str in contains:
-        if re.search(str, text):
-            has_searched = True
-            break
-
-    if not has_searched:
-        return False
-
-    has_forbidden = False
-    for str in not_contains:
-        if re.search(str, text):
-            has_forbidden = True
-            break
-
-    return not has_forbidden
+def is_empty_cart(driver):
+    text = get_page_text(driver)
+    return nlp.check_if_empty_cart(text)
 
 
 def can_click(element):
@@ -76,8 +47,7 @@ def find_links(driver, contains=None, not_contains=None, by_path=False):
         else:
             text = link.get_attribute("outerHTML")
 
-        text = text.lower()
-        if check_text(text, contains, not_contains):
+        if nlp.check_text(text, contains, not_contains):
             result.append(link)
 
     return result
@@ -98,8 +68,8 @@ def find_buttons_or_links(driver,
         if not can_click(elem):
             continue
 
-        text = elem.get_attribute("outerHTML").lower()
-        if check_text(text, contains, not_contains):
+        text = elem.get_attribute("outerHTML")
+        if nlp.check_text(text, contains, not_contains):
             result.append(elem)
 
     return result
@@ -226,7 +196,7 @@ class ToCartLink(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_to_cart_links(driver)
 
-        if click_first(driver, btns):
+        if click_first(driver, btns) and not is_empty_cart(driver):
             return States.cart_page
         else:
             return state
@@ -243,7 +213,7 @@ class ToCheckout(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_checkout_elements(driver)
 
-        if click_first(driver, btns):
+        if click_first(driver, btns) and not is_empty_cart(driver):
             return States.checkout_page
         else:
             return state
