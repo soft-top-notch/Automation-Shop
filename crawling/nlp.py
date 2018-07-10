@@ -35,6 +35,10 @@ def check_text(text, contains, not_contains, normalize=True):
 
     return not has_forbidden
 
+def remove_elements(text, contains):
+    for elem in contains:
+        text.replace(elem, "")
+    return text
 
 def check_if_empty_cart(text):
     contains = ['cart is empty', 

@@ -45,6 +45,20 @@ class UserInfo:
         self.phone = phone
         self.email = email
 
+    def json_userInfo():
+        return {
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "country": self.country,
+            "state": self.state,
+            "home": self.home,
+            "street": self.street,
+            "zip": self.zip,
+            "city": self.city,
+            "phone": self.phone,
+            "email": self.email,
+    }
+
 
 class PaymentInfo:
     def __init__(self,
