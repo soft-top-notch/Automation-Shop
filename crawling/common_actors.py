@@ -2,6 +2,8 @@ from shop_crawler import *
 from selenium_helper import *
 import nlp
 
+from common_heuristics import *
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -9,27 +11,11 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import WebDriverException
 
 import sys
 import re
 import traceback
-
-
-def is_empty_cart(driver):
-    text = get_page_text(driver)
-    return nlp.check_if_empty_cart(text)
-
-
-def can_click(element):
-    try:
-        element.is_enabled();
-        return element.is_displayed()
-    except WebDriverException:
-        logger = logging.getLogger('shop_crawler')
-        logger.debug('Exception during checking element {}'.format(traceback.format_exc()))
-        return False
-        
+       
 
 def find_links(driver, contains=None, not_contains=None, by_path=False):
     links = driver.find_elements_by_css_selector("a[href]")
@@ -76,7 +62,7 @@ def find_buttons_or_links(driver,
 
 def to_string(element):
     try:
-        return element.get_attribute('outerHTML')
+        return element.get_attribute("outerHTML")
     except:
         return str(element)
 
@@ -109,8 +95,9 @@ def click_first(driver, elements, on_error=None):
     logger = logging.getLogger('shop_crawler')
             
     for element in elements:
+        logger.debug('clicking element: {}'.format(to_string(element)))
         clicked = process(element)
-        logger.debug('clicking, result = {}, element = {}'.format(clicked, to_string(element)))
+        logger.debug('result: {}'.format(clicked))
                      
         if clicked:
             return True
@@ -126,8 +113,6 @@ def try_handle_popups(driver):
     btns = find_buttons_or_links(driver, ["i .*over", "i .*age", ".* agree .*"], [' .*not.*', " .*under.*"])
     return click_first(driver, btns)
 
-def tokenize(text):
-    return re.split(r'(\d+|\W+)', text)
 
 class ToProductPageLink(IStepActor):
     def get_states(self):
@@ -150,7 +135,7 @@ class AddToCart(IStepActor):
 
     def filter_button(self, button):
         text = button.get_attribute('innerHTML')
-        words = tokenize(text)
+        words = nlp.tokenize(text)
         if 'buy' in words:
             return len(words) <= 2
         
@@ -159,8 +144,7 @@ class AddToCart(IStepActor):
     def find_to_cart_elements(self, driver):
         btns = find_buttons_or_links(driver, ["add to cart",
                                               "add to bag",
-                                              "buy"
-                                              ])
+                                              "buy"], ['where'])
         return list([btn for btn in btns if self.filter_button(btn)])
 
     def process_page(self, driver, state, context):
@@ -196,10 +180,12 @@ class ToCartLink(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_to_cart_links(driver)
 
-        if click_first(driver, btns) and not is_empty_cart(driver):
-            return States.cart_page
-        else:
-            return state
+        if click_first(driver, btns):
+            time.sleep(30)
+            if not is_empty_cart(driver):
+                return States.cart_page
+        
+        return state
 
 
 class ToCheckout(IStepActor):
@@ -213,10 +199,12 @@ class ToCheckout(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_checkout_elements(driver)
 
-        if click_first(driver, btns) and not is_empty_cart(driver):
-            return States.checkout_page
-        else:
-            return state
+        if click_first(driver, btns):
+            time.sleep(30)
+            if not is_empty_cart(driver):
+                return States.checkout_page
+        
+        return state
 
     
 class GoogleForProductPage(IStepActor):
@@ -230,6 +218,12 @@ class GoogleForProductPage(IStepActor):
         search_input.send_keys(google_query)
         search_input.send_keys(Keys.ENTER)
         
+        # Check if no exact results
+        statuses = driver.find_elements_by_css_selector('div.obp div.med')
+        for status in statuses:
+            if re.search(google_query, status.text):
+                return None
+        
         links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
         if len(links) > 0:
             return links[0].get_attribute("href")
@@ -237,7 +231,7 @@ class GoogleForProductPage(IStepActor):
             return None
     
     def search_for_product_link(self, driver, domain):
-        queries = ['add to cart']
+        queries = ['"add to cart"']
 
         # Open a new tab
         new_tab(driver)

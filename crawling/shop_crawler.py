@@ -6,6 +6,10 @@ import sys
 import time
 from selenium.webdriver.common.keys import Keys
 from selenium_helper import *
+import requests
+import selenium
+import nlp
+from common_heuristics import *
 
 
 class States:
@@ -19,6 +23,67 @@ class States:
     purchased = "purchased"
 
     states = [new, product_page, product_in_cart, checkout_page, payment_page, purchased]
+
+    
+class ICrawlingStatus:
+    """
+        Status of Shop crawling
+    """
+    def __init__(self, 
+                 url, 
+                 status, 
+                 message = None, 
+                 limit = 60, 
+                 redirected_to_domain = None, 
+                 state = None,
+                 exception = None,
+                 chain_urls = None
+                ):
+        
+        self.url = url
+        self.status = status
+        self.message = message
+        self.limit = limit
+        self.redirected_to_domain = redirected_to_domain
+        self.state = state
+        self.exception = exception,
+        self.chain_urls = chain_urls
+        
+    def __str__(self):
+        if self.message:
+            return 'Status: "{}" after processing url "{}"\n {}'.format(self.status, self.url, self.message)
+        else:
+            return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
+            
+
+class NotAvailable(ICrawlingStatus):
+    """
+        Status for shop that are not available
+    """
+    def __init__(self, url, message = None):
+        super().__init__(url, 'Not Available', message = message)
+
+class RequestError(ICrawlingStatus):
+    """
+        Get response with ant
+    """
+    def __init__(self, url, code, message = None):
+        self.code = code
+        super().__init__(url, 'Error {}'.format(self.code), message = message)
+
+class Timeout(ICrawlingStatus):
+    def __init__(self, url, limit, message = None):
+        super().__init__(url, "Time Out", message = message)
+        self.limit = limit
+        
+class ProcessingStatus(ICrawlingStatus):
+    def __init__(self, url, chain_urls, state, exception = None, message = None):
+        super().__init__(url, 'Processing Finished at State',
+                         state = state, 
+                         exception = exception, 
+                         chain_urls = chain_urls,
+                         message = message
+                        )
 
 
 class UserInfo:
@@ -125,8 +190,26 @@ class ShopCrawler:
         if url.startswith('http://') or url.startswith('https://'):
             return url
         return 'http://' + url
+    
+    @staticmethod
+    def get(driver, url, timeout=10):
+        try:
+            driver.get(url)
+            response = requests.get(url, verify=False, timeout=timeout)
+            code = response.status_code
+            if code >= 400:
+                return RequestError(url, code)
+            
+            return None
+        
+        except selenium.common.exceptions.TimeoutException:
+            return Timeout(url, timeout)
+            
+        except requests.exceptions.ConnectionError:
+            return NotAvailable(url)
+        
 
-    def get_driver(self):
+    def get_driver(self, timeout=60):
         if self._driver:
             num_of_tabs = count_tabs(self._driver)
             for x in range(1, num_of_tabs):
@@ -135,7 +218,7 @@ class ShopCrawler:
             return self._driver
         
         driver = create_chrome_driver(self._chrome_path, self._headless)
-        driver.set_page_load_timeout(60)
+        driver.set_page_load_timeout(timeout)
         
         self._driver = driver
         
@@ -163,37 +246,51 @@ class ShopCrawler:
 
         return state
 
-    def crawl(self, domain, wait_response_seconds = 20):
+    def crawl(self, domain, wait_response_seconds = 60):
+        """
+            Crawls shop in domain
+            Returns ICrawlingStatus
+        """
         url = ShopCrawler.normalize_url(domain)
+        chain_urls = [url]
         context = StepContext(domain, self._user_info, self._payment_info)
 
         driver = self.get_driver()
+        state = States.new
         
         try:
-            driver.implicitly_wait(wait_response_seconds)  # seconds
-            driver.get(url)
-
-            state = States.new
+            status = ShopCrawler.get(driver, url, wait_response_seconds)
+            
+            if status:
+                return status
+            
+            if is_domain_for_sale(driver, domain):
+                return NotAvailable(url, message = 'Domain {} for sale'.format(domain))
+            
             new_state = state
 
             while state != States.purchased:
                 frames = [None] + driver.find_elements_by_tag_name("iframe")
-
+                
+                if driver.current_url != chain_urls[-1]:
+                    chain_urls.append(driver.current_url)
+                    
+                if len(frames) > 1:
+                    self._logger.info('found {} frames'.format(len(frames) - 1))
+                                      
                 for frame in frames:
                     with Frame(driver, frame):
                         new_state = self.process_state(driver, state, context)
                         if new_state != state:
                             break
-
+                
                 if state == new_state:
-                    self._logger.info("Can't purchase from shop: {} stopped at state: {}, current url: {}".format(
-                          url, state, driver.current_url))
-
-                    return False
-
+                    return ProcessingStatus(domain, chain_urls, state)
+                    
                 state = new_state
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
-            return False
-        
-        return True
+            exception = traceback.format_exc()
+            return ProcessingStatus(domain, chain_urls, state, exception=exception)
+            
+        return ProcessingStatus(domain, chain_urls, state)

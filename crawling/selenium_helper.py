@@ -1,5 +1,10 @@
 from selenium import webdriver
 from bs4 import BeautifulSoup
+from selenium.common.exceptions import WebDriverException
+import logging
+import traceback
+import wrapt
+
 
 class Frame:
     def __init__(self, driver, frame=None):
@@ -9,15 +14,28 @@ class Frame:
     def __enter__(self):
         if self.frame:
             self.driver.switch_to.frame(self.frame)
+            self.url = self.driver.current_url
 
     def __exit__(self, type, value, traceback):
         if self.frame:
-            self.driver.switch_to.default_content()
+            url = self.driver.current_url
+            
+            # ToDo Do checks without ancors
+            if url == self.url:
+                self.driver.switch_to.default_content()
 
-
+def can_click(element):
+    try:
+        return element.is_enabled() and element.is_displayed()
+    except WebDriverException:
+        logger = logging.getLogger('shop_crawler')
+        logger.debug('Exception during checking element {}'.format(traceback.format_exc()))
+        return False
+    
+    
 def get_page_text(driver):
     html = driver.page_source
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, 'lxml')
     
     for script in soup(["script", "style", "img", "input"]):
         script.decompose()
@@ -36,17 +54,13 @@ def new_tab(driver):
 
     
 def close_tab(driver):
-    default_handle = driver.current_window_handle
     handles = list(driver.window_handles)
     if len(handles) <= 1:
         return
     
-    handles.remove(default_handle)
-    assert len(handles) > 0
-
-    driver.switch_to_window(handles[0])
+    driver.switch_to_window(handles[-1])
     driver.close()
-    driver.switch_to_window(default_handle)
+    driver.switch_to_window(handles[-2])
 
     
 def create_chrome_driver(chrome_path, headless=True):
