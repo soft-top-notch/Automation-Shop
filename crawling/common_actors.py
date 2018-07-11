@@ -355,17 +355,12 @@ class PaymentFields(IStepActor):
                     time.sleep(3)
 
         #the case if authentication is not requiring....
-        dest = find_buttons_or_links(driver, ["confirm*.*order", "place*.*order", "to payment", "to paypal"])
+        if not self.fill_billing_address(driver, context):
+            return state
+        if not self.click_to_order(driver):
+            return state
 
-        if not dest:
-            #Fill checkout fields step by step.....
-            if not self.fill_billing_address(driver, context):
-                return state
-            if not self.click_to_order(driver):
-                return state
-        else:
-            #Fill all fields of checkout page in one page....
-            self.fill_billing_address(driver, context)
+        return States.purchased
 
 
     
@@ -421,4 +416,5 @@ def add_crawler_extensions(crawler):
     crawler.add_handler(ToShopLink(), 1)
     crawler.add_handler(ToCheckout(), 3)
     crawler.add_handler(ToCartLink(), 2)
+    crawler.add_handler(PaymentFields(), 2)
     

@@ -17,7 +17,7 @@ class Frame:
 
 def get_page_text(driver):
     html = driver.page_source
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "html.parser")
     
     for script in soup(["script", "style", "img", "input"]):
         script.decompose()

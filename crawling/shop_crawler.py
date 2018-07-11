@@ -47,8 +47,8 @@ class UserInfo:
 
     def json_userInfo():
         return {
-            "first_name": self.first_name,
-            "last_name": self.last_name,
+            "first name": self.first_name,
+            "last name": self.last_name,
             "country": self.country,
             "state": self.state,
             "home": self.home,
@@ -192,7 +192,6 @@ class ShopCrawler:
 
             while state != States.purchased:
                 frames = [None] + driver.find_elements_by_tag_name("iframe")
-
                 for frame in frames:
                     with Frame(driver, frame):
                         new_state = self.process_state(driver, state, context)
