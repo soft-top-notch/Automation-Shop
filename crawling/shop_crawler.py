@@ -95,7 +95,9 @@ class UserInfo:
                  state,
                  country,
                  phone,
-                 email
+                 email,
+                 card_name,
+                 card_type
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -107,6 +109,8 @@ class UserInfo:
         self.country = country
         self.phone = phone
         self.email = email
+        self.card_name = card_name
+        self.card_type = card_type
 
     def get_json_userinfo(self):
         return {
@@ -120,6 +124,8 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
+            "card_name": self.card_name,
+            "card_type": self.card_type
     }
 
 

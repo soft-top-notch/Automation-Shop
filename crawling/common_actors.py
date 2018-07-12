@@ -210,7 +210,7 @@ class ToCheckout(IStepActor):
         btns = self.find_checkout_elements(driver)
 
         if click_first(driver, btns):
-            time.sleep(30)
+            time.sleep(5)
             if not is_empty_cart(driver):
                 return States.checkout_page
         
@@ -243,7 +243,7 @@ class PaymentFields(IStepActor):
         return label_txt
 
     def find_select(self, driver, contain):
-        selects = driver.find_elements_by_tag_name("select")
+        selects = driver.find_elements_by_css_selector("select")
         result = None
 
         for sel in selects:
@@ -261,8 +261,8 @@ class PaymentFields(IStepActor):
             sel = self.find_select(driver, item)
             if not sel:
                 continue
-            for option in sel.find_elements_by_tag_name("option"):
-                if option.text == context.user_info.state or option.text == context.user_info.country:
+            for option in sel.find_elements_by_css_selector("option"):
+                if context.user_info.state in option.text or context.user_info.country in option.text or context.user_info.card_type in option.text:
                     option.click() # select() in earlier versions of webdriver
                     time.sleep(1)
                     succss_cnt += 1
