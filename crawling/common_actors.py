@@ -2,6 +2,8 @@ from shop_crawler import *
 from selenium_helper import *
 import nlp
 
+from common_heuristics import *
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -9,33 +11,16 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import WebDriverException
-
+from selenium.common.exceptions import ElementNotVisibleException
 import sys
 import re
 import traceback
 import time
 
-
-def is_empty_cart(driver):
-    text = get_page_text(driver)
-    return nlp.check_if_empty_cart(text)
-
-
-def can_click(element):
-    try:
-        element.is_enabled();
-        return element.is_displayed()
-    except WebDriverException:
-        logger = logging.getLogger('shop_crawler')
-        logger.debug('Exception during checking element {}'.format(traceback.format_exc()))
-        return False
-        
-
-def find_in_elems(elements, contains=None, not_contains=None):
+def find_in_elems(elements, contains=None, not_contains=None, check_or_radio=False):
     result = []
     for elem in elements:
-        if not can_click(elem):
+        if not can_click(elem) and not check_or_radio:
             continue
 
         text = elem.get_attribute("outerHTML")
@@ -61,14 +46,8 @@ def find_buttons_or_links(driver,
 def find_radio_or_checkout_btns(driver, contains=None, not_contains=None):
     radiobtns = driver.find_elements_by_css_selector("input[type='radio']")
     checkbtns = driver.find_elements_by_css_selector("input[type='checkbox']")
-    inputs = driver.find_elements_by_css_selector('input[type="button"]')
-    buttons = driver.find_elements_by_css_selector("buttons")
 
-    return find_in_elems((radiobtns + checkbtns + inputs + buttons), contains, not_contains)
-
-def find_selects(driver, contains=None, not_contains=None):
-    selects = driver.find_elements_by_tag_name("select")
-    return find_in_elems(selects, contains, not_contains)
+    return find_in_elems((radiobtns + checkbtns), contains, not_contains, True)
 
 def find_links(driver, contains=None, not_contains=None, by_path=False):
     links = driver.find_elements_by_css_selector("a[href]")
@@ -93,7 +72,7 @@ def find_links(driver, contains=None, not_contains=None, by_path=False):
 
 def to_string(element):
     try:
-        return element.get_attribute('outerHTML')
+        return element.get_attribute("outerHTML")
     except:
         return str(element)
 
@@ -126,8 +105,9 @@ def click_first(driver, elements, on_error=None):
     logger = logging.getLogger('shop_crawler')
             
     for element in elements:
+        logger.debug('clicking element: {}'.format(to_string(element)))
         clicked = process(element)
-        logger.debug('clicking, result = {}, element = {}'.format(clicked, to_string(element)))
+        logger.debug('result: {}'.format(clicked))
                      
         if clicked:
             return True
@@ -143,8 +123,6 @@ def try_handle_popups(driver):
     btns = find_buttons_or_links(driver, ["i .*over", "i .*age", ".* agree .*"], [' .*not.*', " .*under.*"])
     return click_first(driver, btns)
 
-def tokenize(text):
-    return re.split(r'(\d+|\W+)', text)
 
 class ToProductPageLink(IStepActor):
     def get_states(self):
@@ -167,7 +145,7 @@ class AddToCart(IStepActor):
 
     def filter_button(self, button):
         text = button.get_attribute('innerHTML')
-        words = tokenize(text)
+        words = nlp.tokenize(text)
         if 'buy' in words:
             return len(words) <= 2
         
@@ -176,8 +154,7 @@ class AddToCart(IStepActor):
     def find_to_cart_elements(self, driver):
         btns = find_buttons_or_links(driver, ["add to cart",
                                               "add to bag",
-                                              "buy"
-                                              ])
+                                              "buy"], ['where'])
         return list([btn for btn in btns if self.filter_button(btn)])
 
     def process_page(self, driver, state, context):
@@ -213,10 +190,12 @@ class ToCartLink(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_to_cart_links(driver)
 
-        if click_first(driver, btns) and not is_empty_cart(driver):
-            return States.cart_page
-        else:
-            return state
+        if click_first(driver, btns):
+            time.sleep(30)
+            if not is_empty_cart(driver):
+                return States.cart_page
+        
+        return state
 
 
 class ToCheckout(IStepActor):
@@ -230,10 +209,12 @@ class ToCheckout(IStepActor):
     def process_page(self, driver, state, context):
         btns = self.find_checkout_elements(driver)
 
-        if click_first(driver, btns) and not is_empty_cart(driver):
-            return States.checkout_page
-        else:
-            return state
+        if click_first(driver, btns):
+            time.sleep(30)
+            if not is_empty_cart(driver):
+                return States.checkout_page
+        
+        return state
 
 
 class PaymentFields(IStepActor):
@@ -249,19 +230,41 @@ class PaymentFields(IStepActor):
     def find_auth_pass_elements(self, driver):
         return find_radio_or_checkout_btns(driver, ["guest", "create*.*later"])
 
+    def get_labelText_with_elem_attr(self, driver, elem):
+        label_txt = ""
+
+        if elem.get_attribute("id"):
+            label = driver.find_elements_by_css_selector("label[for='%s']" % elem.get_attribute("id"))
+            if label:
+                label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
+        elif elem.get_attribute("name"):
+            label_txt = nlp.remove_elements(elem.get_attribute("name"), ["/", "*", "-", "_", ":", " "]).lower()
+
+        return label_txt
+
+    def find_select(self, driver, contain):
+        selects = driver.find_elements_by_tag_name("select")
+        result = None
+
+        for sel in selects:
+            label_txt = self.get_labelText_with_elem_attr(driver, sel)
+
+            if contain in label_txt:
+                result = sel
+                break
+
+        return result
+
     def select_country_or_state(self, driver, contains, context):
         succss_cnt = 0
         for item in contains:
-            selects = find_selects(driver, [item])
-            for elem in selects:
-                flg_cnt = False
-                for option in elem.find_elements_by_tag_name("option"):
-                    if option.text == context.user_info.state or option.text == context.user_info.country:
-                        option.click() # select() in earlier versions of webdriver
-                        time.sleep(2)
-                        flg_cnt = True
-                        break
-                if flg_cnt:
+            sel = self.find_select(driver, item)
+            if not sel:
+                continue
+            for option in sel.find_elements_by_tag_name("option"):
+                if option.text == context.user_info.state or option.text == context.user_info.country:
+                    option.click() # select() in earlier versions of webdriver
+                    time.sleep(1)
                     succss_cnt += 1
                     break
         return succss_cnt > 0
@@ -269,30 +272,19 @@ class PaymentFields(IStepActor):
     def fill_billing_address(self, driver, context):
         logger = logging.getLogger('shop_crawler')
 
-        if not self.select_country_or_state(driver, ["country, state"], context):
-            logger.debug('Country or State is not correct: country = {}, state = {}'.
+        if not self.select_country_or_state(driver, ["country", "state", "card"], context):
+            logger.debug('Selects are not exist: country = {}, state = {}'.
                 format(
                     context.user_info.country,
                     context.user_info.state
                 )
             )
             return False
-
         input_texts = driver.find_elements_by_css_selector("input[type='text']")
-        json_userInfo = context.user_info.json_userInfo()
+        json_userInfo = context.user_info.get_json_userinfo()
 
         for elem in input_texts:
-            label_txt = ""
-
-            if not self.get_elem_attribute(elem, ["id", "name"]):
-                continue
-            elif elem.get_attribute("id"):
-                label = driver.find_elements_by_css_selector("label[for='%s']" % elem.get_attribute("id"))
-                if not label:
-                    continue
-                label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
-            elif elem.get_attribute("name"):
-                label_txt = nlp.remove_elements(elem.get_attribute("name"), ["/", "*", "-", "_", ":", " "]).lower()
+            label_txt = self.get_labelText_with_elem_attr(driver, elem)
 
             if not label_txt:
                 continue
@@ -313,27 +305,31 @@ class PaymentFields(IStepActor):
 
         while True:
             dest = find_buttons_or_links(driver, ["confirm*.*order", "place*.*order", "to payment", "to paypal"])
+            agree_btns = find_radio_or_checkout_btns(driver, ["agree", "terms", "paypal*.*payment", "payment*.*paypal"])
 
+            if agree_btns:
+                for elem in agree_btns:
+                    if not elem.is_selected():
+                        try:
+                            elem.click()
+                        except ElementNotVisibleException:
+                            pass
+                        break
             if dest:
                 break
+
             continue_btns = find_buttons_or_links(driver, ["continue"], ["login"])
             if not continue_btns:
                 bill_btns = find_buttons_or_links(driver, ["bill"])
                 if not bill_btns:
                     logger.debug('Step over error')
                     return False
-                bill_btns[len(continue_btns) - 1].click()
+                bill_btns[len(bill_btns) - 1].click()
             else:
                 continue_btns[len(continue_btns) - 1].click()
             time.sleep(2)
         dest[0].click()
         return True
-
-    def get_elem_attribute(self, elem, attrs):
-        for item in attrs:
-            if elem.get_attribute(item):
-                return elem.get_attribute(item)
-        return None
 
     def filter_page(self, driver, state, content):
         if self.find_pwd_in_checkout(driver):
@@ -342,9 +338,9 @@ class PaymentFields(IStepActor):
         return True
 
     def process_page(self, driver, state, context):
+        #the case if authentication is requiring, pass authentication by creating an account as guest...
         auth_pass = self.find_auth_pass_elements(driver)
 
-        #the case if authentication is requiring, pass authentication by creating an account as guest...
         if auth_pass:
             #create an account as guest....
             if not click_first(driver, auth_pass):
@@ -352,7 +348,7 @@ class PaymentFields(IStepActor):
             account_btn = find_buttons_or_links(driver, ["button*.*account", "account*.*button"])
             if account_btn:
                 if click_first(driver, account_btn):
-                    time.sleep(3)
+                    time.sleep(2)
 
         #the case if authentication is not requiring....
         if not self.fill_billing_address(driver, context):
@@ -375,14 +371,20 @@ class GoogleForProductPage(IStepActor):
         search_input.send_keys(google_query)
         search_input.send_keys(Keys.ENTER)
         
+        # Check if no exact results
+        statuses = driver.find_elements_by_css_selector('div.obp div.med')
+        for status in statuses:
+            if re.search(google_query, status.text):
+                return None
+        
         links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
         if len(links) > 0:
             return links[0].get_attribute("href")
         else:
             return None
-    
+
     def search_for_product_link(self, driver, domain):
-        queries = ['add to cart']
+        queries = ['"add to cart"']
 
         # Open a new tab
         new_tab(driver)
@@ -397,7 +399,7 @@ class GoogleForProductPage(IStepActor):
         close_tab(driver)
         
         return link
-    
+
     def process_page(self, driver, state, context):
         link = self.search_for_product_link(driver, context.domain)
         
