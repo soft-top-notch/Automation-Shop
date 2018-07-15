@@ -10,7 +10,7 @@ def normalize_text(text):
 def tokenize(text):
     return re.split(r'(\d+|\W+)', text)
 
-def check_text(text, contains, not_contains, normalize=True):
+def check_text(text, contains, not_contains=None, normalize=True):
     if not contains:
         contains = []
 
@@ -22,7 +22,7 @@ def check_text(text, contains, not_contains, normalize=True):
 
     has_searched = False
     for str in contains:
-        if re.search(str, text):
+        if re.search(str.lower(), text):
             has_searched = True
             break
 
@@ -42,6 +42,32 @@ def remove_elements(text, contains):
     for elem in contains:
         strName=strName.replace(elem, "")
     return strName
+
+def get_element_attribute(element):
+    if element.get_attribute('id'):
+        return ['id', element.get_attribute('id')]
+    elif element.get_attribute('name'):
+        return ['name', element.get_attribute('name')]
+    elif element.get_attribute('value'):
+        return ['value', element.get_attribute('value')]
+
+    return None
+
+def wait_until_attribute_disappear(attr_type, attr_name):
+    try:
+        if attr_type == "id":
+            element = WebDriverWait(driver, 5).until(
+                EC.invisibility_of_element_located((By.ID, attr_name))
+            )
+        elif attr_type == "name":
+                element = WebDriverWait(driver, 5).until(
+                    EC.invisibility_of_element_located((By.NAME, attr_name))
+                )
+    except TimeoutException:
+        print('The element does not disappear')
+        return False
+
+    return True
 
 def check_if_empty_cart(text):
     contains = ['cart is empty', 

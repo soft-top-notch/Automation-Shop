@@ -16,6 +16,7 @@ import sys
 import re
 import traceback
 import time
+import calendar
 
 def find_in_elems(elements, contains=None, not_contains=None, check_or_radio=False):
     result = []
@@ -43,11 +44,14 @@ def find_buttons_or_links(driver,
     return find_in_elems((links + buttons + inputs + submits), contains, not_contains)
 
 
-def find_radio_or_checkout_btns(driver, contains=None, not_contains=None):
+def find_radio_or_checkout_button(driver,
+                                  contains=None,
+                                  not_contains=None):
     radiobtns = driver.find_elements_by_css_selector("input[type='radio']")
     checkbtns = driver.find_elements_by_css_selector("input[type='checkbox']")
 
     return find_in_elems((radiobtns + checkbtns), contains, not_contains, True)
+
 
 def find_links(driver, contains=None, not_contains=None, by_path=False):
     links = driver.find_elements_by_css_selector("a[href]")
@@ -69,6 +73,7 @@ def find_links(driver, contains=None, not_contains=None, by_path=False):
             result.append(link)
 
     return result
+
 
 def to_string(element):
     try:
@@ -120,7 +125,11 @@ def click_first(driver, elements, on_error=None):
 
 
 def try_handle_popups(driver):
-    btns = find_buttons_or_links(driver, ["i .*over", "i .*age", ".* agree .*"], [' .*not.*', " .*under.*"])
+    btns = find_buttons_or_links(
+        driver,
+        ["i .*over", "i .*age", ".* agree .*"],
+        [' .*not.*', " .*under.*"]
+    )
     return click_first(driver, btns)
 
 
@@ -199,7 +208,6 @@ class ToCartLink(IStepActor):
 
 
 class ToCheckout(IStepActor):
-
     def find_checkout_elements(self, driver):
         return find_buttons_or_links(driver, ["checkout", "check out"])
 
@@ -210,7 +218,7 @@ class ToCheckout(IStepActor):
         btns = self.find_checkout_elements(driver)
 
         if click_first(driver, btns):
-            time.sleep(5)
+            time.sleep(10)
             if not is_empty_cart(driver):
                 return States.checkout_page
         
@@ -218,129 +226,250 @@ class ToCheckout(IStepActor):
 
 
 class PaymentFields(IStepActor):
-
     def get_states(self):
         return [States.checkout_page]
 
     def find_pwd_in_checkout(self, driver):
         pwd_inputs = driver.find_elements_by_css_selector("input[type='password']")
 
-        return len(pwd_inputs) > 0
+        return pwd_inputs
 
     def find_auth_pass_elements(self, driver):
-        return find_radio_or_checkout_btns(driver, ["guest", "create*.*later"])
+        return find_radio_or_checkout_button(driver, ["guest", "create*.*later"])
 
-    def get_labelText_with_elem_attr(self, driver, elem):
+    def get_label_text_with_attribute(self, driver, elem):
         label_txt = ""
+        element_attribute = nlp.get_element_attribute(elem)
 
-        if elem.get_attribute("id"):
-            label = driver.find_elements_by_css_selector("label[for='%s']" % elem.get_attribute("id"))
+        if element_attribute:
+            label = driver.find_elements_by_css_selector("label[for='%s']" % element_attribute[1])
             if label:
                 label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
-        elif elem.get_attribute("name"):
-            label_txt = nlp.remove_elements(elem.get_attribute("name"), ["/", "*", "-", "_", ":", " "]).lower()
+            else:
+                label_txt = nlp.remove_elements(
+                    element_attribute[1],
+                    ["/", "*", "-", "_", ":", " "]
+                ).lower()
 
         return label_txt
 
-    def find_select(self, driver, contain):
+    def find_select_element(self, driver, contain, consider_contain=None):
         selects = driver.find_elements_by_css_selector("select")
         result = None
+        pass_once = False
+        content = contain
+
+        if consider_contain:
+            if content == consider_contain[0]:
+                content = consider_contain[1]
+                pass_once = True
 
         for sel in selects:
-            label_txt = self.get_labelText_with_elem_attr(driver, sel)
+            label_text = self.get_label_text_with_attribute(driver, sel)
 
-            if contain in label_txt:
+            if nlp.check_text(label_text, [content]):
+                if pass_once:
+                    pass_once = False
+                    continue
                 result = sel
                 break
-
         return result
 
-    def select_country_or_state(self, driver, contains, context):
-        succss_cnt = 0
+    def process_select_option(self, driver, contains, context):
+        result_cnt = 0
         for item in contains:
-            sel = self.find_select(driver, item)
+            sel = self.find_select_element(driver, item, ['exp1', 'exp'])
             if not sel:
                 continue
             for option in sel.find_elements_by_css_selector("option"):
-                if context.user_info.state in option.text or context.user_info.country in option.text or context.user_info.card_type in option.text:
+                if nlp.check_text(option.text, [
+                        context.user_info.state,
+                        context.user_info.country,
+                        context.payment_info.card_type,
+                        str(context.payment_info.expire_date_year),
+                        calendar.month_abbr[context.payment_info.expire_date_month],
+                        str(context.payment_info.expire_date_month)
+                    ]):
                     option.click() # select() in earlier versions of webdriver
-                    time.sleep(1)
-                    succss_cnt += 1
+                    time.sleep(2)
+                    result_cnt += 1
                     break
-        return succss_cnt > 0
+        return result_cnt > 0
 
-    def fill_billing_address(self, driver, context):
+    def input_fields_in_checkout(self,
+                                 driver,
+                                 context,
+                                 select_contains,
+                                 extra_contains,
+                                 is_userInfo=True,
+                                 not_extra_contains=None):
         logger = logging.getLogger('shop_crawler')
+        success_flag = False
 
-        if not self.select_country_or_state(driver, ["country", "state", "card"], context):
-            logger.debug('Selects are not exist: country = {}, state = {}'.
-                format(
-                    context.user_info.country,
-                    context.user_info.state
-                )
-            )
-            return False
+        if not self.process_select_option(driver, select_contains, context):
+            logger.debug("Not found select options!")
+
         input_texts = driver.find_elements_by_css_selector("input[type='text']")
-        json_userInfo = context.user_info.get_json_userinfo()
+        input_texts += driver.find_elements_by_css_selector("input[type='email']")
+
+        if is_userInfo:
+            json_Info = context.user_info.get_json_userinfo()
+        else:
+            json_Info = context.payment_info.get_json_paymentinfo()
 
         for elem in input_texts:
-            label_txt = self.get_labelText_with_elem_attr(driver, elem)
+            label_text = self.get_label_text_with_attribute(driver, elem)
 
-            if not label_txt:
+            if not label_text:
                 continue
-            elif "address" in label_txt:
-                label_txt += "street"
-            elif "post" in label_txt:
-                label_txt += "zip"
-            for key in json_userInfo.keys():
-                if nlp.remove_elements(key, [" "]) in label_txt:
-                    elem.click()
-                    elem.send_keys(json_userInfo[key])
-                    break
-        return True
 
-    def click_to_order(self, driver):
+            for conItem in extra_contains:
+                if nlp.check_text(label_text, conItem[0].split(","), not_extra_contains):
+                    label_text = conItem[1]
+                    break
+            for key in json_Info.keys():
+                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]):
+                    try:
+                        elem.click()
+                        elem.send_keys(json_Info[key])
+                        success_flag = True
+                    except:
+                        pass
+                    break
+        return success_flag
+
+    def fill_billing_address(self, driver, context):
+        select_contains = ["country", "state"]
+        not_extra_contains = ["email"]
+        extra_contains = [
+            ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
+            ["post", "zip"]
+        ]
+
+        return self.input_fields_in_checkout(
+            driver,
+            context,
+            select_contains,
+            extra_contains,
+            True,
+            not_extra_contains
+        )
+
+    def fill_payment_info(self, driver, context):
+        select_contains = ["card", "exp", "exp1"]
+        not_extra_contains = ["first", "last", "phone"]
+        extra_contains = [
+            ["owner", "name"],
+            ["cc.*n", "number"],
+            ["verif*,secur*,cv,ccc", "cvc"]
+        ]
+        return self.input_fields_in_checkout(
+            driver,
+            context,
+            select_contains,
+            extra_contains,
+            False
+        )
+
+    def click_one_element(self, elements):
+        for element in elements:
+            if element.is_displayed():
+                try:
+                    element.click()
+                    time.sleep(3)
+                    return True
+                except:
+                    pass
+        return False
+
+    def click_to_order(self, driver, context):
         logger = logging.getLogger('shop_crawler')
         dest = []
+        is_paymentinfo = True
+        payment_url = None
 
         while True:
-            dest = find_buttons_or_links(driver, ["confirm*.*order", "place*.*order", "to payment", "to paypal"])
-            agree_btns = find_radio_or_checkout_btns(driver, ["agree", "terms", "paypal*.*payment", "payment*.*paypal"])
+            order = find_buttons_or_links(
+                driver,
+                ["confirm*.*order", "place*.*order", "pay*.*order"]
+            )
+            agree_btns = find_radio_or_checkout_button(
+                driver,
+                ["agree", "terms", "paypal"],
+                ["express"]
+            )
 
             if agree_btns:
                 for elem in agree_btns:
                     if not elem.is_selected():
                         try:
                             elem.click()
+                            break
                         except ElementNotVisibleException:
                             pass
-                        break
-            if dest:
+            if order:
                 break
 
             continue_btns = find_buttons_or_links(driver, ["continue"], ["login"])
-            if not continue_btns:
-                bill_btns = find_buttons_or_links(driver, ["bill"])
-                if not bill_btns:
+            flag = False
+
+            if continue_btns:
+                try:
+                    continue_btns[len(continue_btns) - 1].click()
+                except:
+                    flag = True
+                    pass
+            if flag or not continue_btns:
+                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"])
+                if not forward_btns:
                     logger.debug('Step over error')
                     return False
-                bill_btns[len(bill_btns) - 1].click()
-            else:
-                continue_btns[len(continue_btns) - 1].click()
+                forward_btns[len(forward_btns) - 1].click()
             time.sleep(2)
-        dest[0].click()
+
+        if not self.fill_payment_info(driver, context):
+            is_paymentinfo = False
+
+        if order[0].get_attribute('href'):
+            payment_url = order[0].get_attribute('href')
+
+        import pdb;pdb.set_trace()
+        '''paying or clicking place order for paying...'''
+
+        order_attribute = nlp.get_element_attribute(order[0])
+        order[0].click()
+
+        if order_attribute[0] == "value":
+            time.sleep(3)
+        else:
+            return nlp.wait_until_attribute_disappear(order_attribute[0], order_attribute[1])
+
+        '''paying if payment info is not inputed'''
+        if payment_url:
+            driver.get(payment_url)
+        if not is_paymentinfo:
+            if not self.fill_payment_info(driver, context):
+                return False
+            pay_button = find_buttons_or_links(
+                driver,
+                ["pay"]
+            )
+            return self.click_one_element(pay_button)
+
         return True
 
     def filter_page(self, driver, state, content):
-        if self.find_pwd_in_checkout(driver):
-            if not self.find_auth_pass_elements(driver):
-                return False
+        password_fields = self.find_pwd_in_checkout(driver)
+
+        if password_fields:
+            if password_fields[0].is_displayed():
+                if not self.find_auth_pass_elements(driver):
+                    return False
         return True
 
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
         auth_pass = self.find_auth_pass_elements(driver)
-
         if auth_pass:
             #create an account as guest....
             if not click_first(driver, auth_pass):
@@ -353,7 +482,7 @@ class PaymentFields(IStepActor):
         #the case if authentication is not requiring....
         if not self.fill_billing_address(driver, context):
             return state
-        if not self.click_to_order(driver):
+        if not self.click_to_order(driver, context):
             return state
 
         return States.purchased
@@ -419,4 +548,3 @@ def add_crawler_extensions(crawler):
     crawler.add_handler(ToCheckout(), 3)
     crawler.add_handler(ToCartLink(), 2)
     crawler.add_handler(PaymentFields(), 2)
-    

@@ -96,8 +96,6 @@ class UserInfo:
                  country,
                  phone,
                  email,
-                 card_name,
-                 card_type
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -109,8 +107,6 @@ class UserInfo:
         self.country = country
         self.phone = phone
         self.email = email
-        self.card_name = card_name
-        self.card_type = card_type
 
     def get_json_userinfo(self):
         return {
@@ -124,22 +120,32 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
-            "card_name": self.card_name,
-            "card_type": self.card_type
-    }
+        }
 
 
 class PaymentInfo:
     def __init__(self,
                  card_number,
+                 card_name,
+                 card_type,
                  expire_date_year,
                  expire_date_month,
                  cvc
                  ):
         self.card_number = card_number
+        self.card_name = card_name
+        self.card_type = card_type
         self.expire_date_year = expire_date_year
         self.expire_date_month = expire_date_month
         self.cvc = cvc
+
+    def get_json_paymentinfo(self):
+        return {
+            "number": self.card_number,
+            "name": self.card_name,
+            "type": self.card_type,
+            "cvc": self.cvc,
+        }
 
 
 class StepContext:
