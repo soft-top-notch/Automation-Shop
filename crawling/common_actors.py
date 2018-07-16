@@ -130,6 +130,7 @@ class ToProductPageLink(IStepActor):
     
     def process_links(self, driver, state, links):
         attempts = 5
+        links = list(links)
         random.shuffle(links)
         
         for i in range(attempts):
