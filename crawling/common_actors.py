@@ -348,7 +348,6 @@ class PaymentFields(IStepActor):
     def process_select_option(self, driver, contains, context):
         result_cnt = 0
         for item in contains:
-            import pdb;pdb.set_trace()
             sel = self.find_select_element(driver, item, ['exp1', 'exp'])
             if not sel:
                 continue
