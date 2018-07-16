@@ -309,14 +309,14 @@ class PaymentFields(IStepActor):
 
     def get_label_text_with_attribute(self, driver, elem):
         label_txt = ""
-        element_attribute = nlp.get_element_attribute(elem)
+        element_attribute = get_element_attribute(elem)
 
         if element_attribute:
             label = driver.find_elements_by_css_selector("label[for='%s']" % element_attribute[1])
             if label:
-                label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
+                label_txt = remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
             else:
-                label_txt = nlp.remove_elements(
+                label_txt = remove_elements(
                     element_attribute[1],
                     ["/", "*", "-", "_", ":", " "]
                 ).lower()
@@ -398,7 +398,7 @@ class PaymentFields(IStepActor):
                     label_text = conItem[1]
                     break
             for key in json_Info.keys():
-                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]):
+                if nlp.check_text(label_text, [remove_elements(key, [" "])]):
                     try:
                         elem.click()
                         elem.send_keys(json_Info[key])
@@ -505,7 +505,7 @@ class PaymentFields(IStepActor):
 
         '''paying or clicking place order for paying...'''
 
-        order_attribute = nlp.get_element_attribute(order[0])
+        order_attribute = get_element_attribute(order[0])
         order[0].click()
         time.sleep(2)
 

@@ -37,21 +37,6 @@ def check_text(text, contains, not_contains=None, normalize=True):
 
     return not has_forbidden
 
-def remove_elements(text, contains):
-    strName = text
-    for elem in contains:
-        strName=strName.replace(elem, "")
-    return strName
-
-def get_element_attribute(element):
-    if element.get_attribute('id'):
-        return ['id', element.get_attribute('id')]
-    elif element.get_attribute('name'):
-        return ['name', element.get_attribute('name')]
-    elif element.get_attribute('value'):
-        return ['value', element.get_attribute('value')]
-
-    return None
 
 def check_if_empty_cart(text):
     contains = ['(cart|bag) is empty',

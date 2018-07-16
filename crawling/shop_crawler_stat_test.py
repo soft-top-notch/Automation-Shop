@@ -88,7 +88,7 @@ logger.addHandler(handler)
 
 results = []
 with get_crawler(headless=False) as crawler:
-    for url in good_urls:
+    for url in sample_urls:
         print('\n\n{}'.format(url))
         status = crawler.crawl(url, 30, attempts=1)
         print(status)
