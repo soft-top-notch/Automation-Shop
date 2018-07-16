@@ -22,7 +22,7 @@ class States:
     payment_page = "payment_page"
     purchased = "purchased"
 
-    states = [new, product_page, product_in_cart, checkout_page, payment_page, purchased]
+    states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
 
 
 class ICrawlingStatus:
@@ -55,6 +55,7 @@ class ICrawlingStatus:
         else:
             return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
 
+
 class NotAvailable(ICrawlingStatus):
     """
         Status for shop that are not available
@@ -84,6 +85,7 @@ class ProcessingStatus(ICrawlingStatus):
                          message = message
                         )
 
+
 class UserInfo:
     def __init__(self,
                  first_name,
@@ -95,7 +97,7 @@ class UserInfo:
                  state,
                  country,
                  phone,
-                 email,
+                 email
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -184,7 +186,7 @@ class IStepActor:
 
 class ShopCrawler:
     def __init__(self, user_info, payment_info,
-                 chrome_path='/usr/bin/chromedriver',
+                 chrome_path='/usr/local/chromedriver',
                  headless=True
                  ):
         self._handlers = []
@@ -201,8 +203,9 @@ class ShopCrawler:
     
     def __exit__(self, type, value, traceback):
         if self._driver:
+            self.close_alert_if_appeared()
             self._driver.quit()
-            
+
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -216,7 +219,7 @@ class ShopCrawler:
         return 'http://' + url
     
     @staticmethod
-    def get(driver, url, timeout=15):
+    def get(driver, url, timeout=10):
         try:
             driver.get(url)
             response = requests.get(url, verify=False, timeout=timeout)
@@ -231,24 +234,30 @@ class ShopCrawler:
             
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
-        
+
+
+    def close_alert_if_appeared(self):
+        alert = find_alert(self._driver)
+        if alert:
+            self._logger.info('found alert with text {}'.format(alert.text))
+            alert.dismiss()
+
 
     def get_driver(self, timeout=60):
         if self._driver:
-            num_of_tabs = count_tabs(self._driver)
-            for x in range(1, num_of_tabs):
-                close_tab(self._driver)
-            
-            return self._driver
-        
+            self._driver.quit()
+
         driver = create_chrome_driver(self._chrome_path, self._headless)
         driver.set_page_load_timeout(timeout)
-        
+
         self._driver = driver
-        
+
         return driver
-    
+
     def process_state(self, driver, state, context):
+        # Close Alert if appeared
+        self.close_alert_if_appeared()
+
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
 
@@ -257,7 +266,9 @@ class ShopCrawler:
         self._logger.info('processing state: {}'.format(state))
 
         for priority, handler in handlers:
-            
+            # Close Alert if appeared
+            self.close_alert_if_appeared()
+
             self._logger.info('handler {}'.format(handler))
             new_state = handler.act(driver, state, context)
             self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
@@ -269,27 +280,51 @@ class ShopCrawler:
 
         return state
 
-    def crawl(self, domain, wait_response_seconds = 60):
+    def crawl(self, domain, wait_response_seconds = 60, attempts = 3):
         """
             Crawls shop in domain
             Returns ICrawlingStatus
         """
+
+        result = None
+        best_state_idx = -1
+        for attempt in range(attempts):
+            attempt_result = self.do_crawl(domain, wait_response_seconds)
+
+            if isinstance(attempt_result, ProcessingStatus):
+                idx = States.states.index(attempt_result.state)
+                if idx > best_state_idx:
+                    best_state_idx = idx
+                    result = attempt_result
+
+                # Don't need randomization if we have already navigated to checkout page
+                if idx >= States.states.index(States.checkout_page):
+                    break
+
+            if not result:
+                result = attempt_result
+
+        return result
+
+
+    def do_crawl(self, domain, wait_response_seconds = 60):
+
         url = ShopCrawler.normalize_url(domain)
         chain_urls = [url]
         context = StepContext(domain, self._user_info, self._payment_info)
 
         driver = self.get_driver()
         state = States.new
-        
+
         try:
             status = ShopCrawler.get(driver, url, wait_response_seconds)
-            
+
             if status:
                 return status
-            
+
             if is_domain_for_sale(driver, domain):
                 return NotAvailable(url, message = 'Domain {} for sale'.format(domain))
-            
+
             new_state = state
 
             while state != States.purchased:
@@ -301,10 +336,11 @@ class ShopCrawler:
                 if len(frames) > 1:
                     self._logger.info('found {} frames'.format(len(frames) - 1))
 
+                last_url = driver.current_url
                 for frame in frames:
                     with Frame(driver, frame):
                         new_state = self.process_state(driver, state, context)
-                        if new_state != state:
+                        if new_state != state or last_url != driver.current_url:
                             break
 
                 if state == new_state:
@@ -315,5 +351,5 @@ class ShopCrawler:
             self._logger.exception("Unexpected exception during processing {}".format(url))
             exception = traceback.format_exc()
             return ProcessingStatus(domain, chain_urls, state, exception=exception)
-            
+
         return ProcessingStatus(domain, chain_urls, state)

@@ -22,7 +22,7 @@ def check_text(text, contains, not_contains=None, normalize=True):
 
     has_searched = False
     for str in contains:
-        if re.search(str.lower(), text):
+        if re.search(str, text):
             has_searched = True
             break
 
@@ -54,14 +54,12 @@ def get_element_attribute(element):
     return None
 
 def check_if_empty_cart(text):
-    contains = ['cart is empty', 
-                'no .*in .*cart',
-                'zero products in .*cart', 
-                'nothing in.* cart', 
-                'empty cart',
-                '0 items',
-                'zero items'
-               ]
+    contains = ['(cart|bag) is empty',
+            'zero (products|items|tickets) in (cart|bag)',
+            'zero (products|items|tickets) in .\w* (cart|bag)',
+            'no (products|items|tickets) in (cart|bag)',
+            'no (products|items|tickets) in .\w* (cart|bag)'
+           ]
     
     return check_text(text, contains, [])
 

@@ -4,6 +4,8 @@ from selenium.common.exceptions import WebDriverException
 import logging
 import traceback
 import wrapt
+from selenium.webdriver.support.expected_conditions import *
+from selenium.webdriver.common.alert import *
 
 
 class Frame:
@@ -29,7 +31,6 @@ def can_click(element):
         return element.is_enabled() and element.is_displayed()
     except WebDriverException:
         logger = logging.getLogger('shop_crawler')
-        logger.debug('Exception during checking element {}'.format(traceback.format_exc()))
         return False
     
     
@@ -78,3 +79,9 @@ def create_chrome_driver(chrome_path, headless=True):
     options.add_argument("--disable-save-password-bubble")
 
     return webdriver.Chrome(chrome_path, chrome_options=options)
+
+def back(driver):
+     driver.execute_script("window.history.go(-1)")
+
+def find_alert(driver):
+    return alert_is_present()(driver)

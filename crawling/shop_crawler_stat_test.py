@@ -18,15 +18,14 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
             all_urls.append(url)
 
 # Random sample urls
-random.seed(1)
+random.seed(4)
 sample_urls = random.sample(all_urls, 100)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'shop.lifesmokevapors.com',
+    'docssmokeshop.com',
     'www.vapininthecape.com',
     'jonessurgical.com',
-    'docssmokeshop.com',
     'www.vaporsupply.com',
     'firstfitness.com',
     'srandd.com',
@@ -91,7 +90,7 @@ results = []
 with get_crawler(headless=False) as crawler:
     for url in good_urls:
         print('\n\n{}'.format(url))
-        status = crawler.crawl(url, 30)
+        status = crawler.crawl(url, 30, attempts=1)
         print(status)
         results.append(status)
 
