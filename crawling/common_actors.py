@@ -450,7 +450,6 @@ class PaymentFields(IStepActor):
         if order[0].get_attribute('href'):
             payment_url = order[0].get_attribute('href')
 
-        import pdb;pdb.set_trace()
         '''paying or clicking place order for paying...'''
 
         order_attribute = nlp.get_element_attribute(order[0])
