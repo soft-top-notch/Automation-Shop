@@ -39,14 +39,12 @@ def check_text(text, contains, not_contains, normalize=True):
 
 
 def check_if_empty_cart(text):
-    contains = ['cart is empty', 
-                'no .*in .*cart',
-                'zero products in .*cart', 
-                'nothing in.* cart', 
-                'empty cart',
-                '0 items',
-                'zero items'
-               ]
+    contains = ['(cart|bag) is empty', 
+            'zero (products|items|tickets) in (cart|bag)',
+            'zero (products|items|tickets) in .\w* (cart|bag)',
+            'no (products|items|tickets) in (cart|bag)',
+            'no (products|items|tickets) in .\w* (cart|bag)'
+           ]
     
     return check_text(text, contains, [])
 
