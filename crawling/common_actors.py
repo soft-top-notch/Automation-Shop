@@ -129,6 +129,9 @@ class ToProductPageLink(IStepActor):
 
     
     def process_links(self, driver, state, links):
+        if not links:
+            return state
+        
         attempts = 5
         links = list(links)
         random.shuffle(links)
@@ -152,7 +155,7 @@ class ToProductPageLink(IStepActor):
         return state
     
     def process_page(self, driver, state, context):
-        links = [link.get_attribute('href') for link in self.find_to_product_links(driver)]
+        links = list([link.get_attribute('href') for link in self.find_to_product_links(driver)])
         
         return self.process_links(driver, state, links)
 
@@ -310,7 +313,7 @@ class SearchForProductPage(IStepActor):
     def search_for_product_link(self, driver, domain):
         queries = ['"add to cart"']
 
-        link = None
+        links = None
         # Open a new tab
         try:
             new_tab(driver)
@@ -332,13 +335,16 @@ class SearchForProductPage(IStepActor):
             # Close new tab
             close_tab(driver)
         
-        return link
+        return links
     
     def process_page(self, driver, state, context):
         links = self.search_for_product_link(driver, context.domain)
         
-        handler = ToProductPageLink()
-        return handler.process_links(driver, state, links)
+        if links:
+            handler = ToProductPageLink()
+            return handler.process_links(driver, state, links)
+        
+        return state
     
        
 def add_crawler_extensions(crawler):
