@@ -124,6 +124,23 @@ def click_first(driver, elements, on_error=None):
     return False
 
 
+def wait_until_attribute_disappear(driver, attr_type, attr_name):
+    try:
+        if attr_type == "id":
+            element = WebDriverWait(driver, 2).until(
+                EC.invisibility_of_element_located((By.ID, attr_name))
+            )
+        elif attr_type == "name":
+                element = WebDriverWait(driver, 2).until(
+                    EC.invisibility_of_element_located((By.NAME, attr_name))
+                )
+    except TimeoutException:
+        print('The element does not disappear')
+        return False
+
+    return True
+
+
 def try_handle_popups(driver):
     btns = find_buttons_or_links(
         driver,
@@ -339,7 +356,7 @@ class PaymentFields(IStepActor):
         return success_flag
 
     def fill_billing_address(self, driver, context):
-        select_contains = ["country", "state"]
+        select_contains = ["country", "state", "zone"]
         not_extra_contains = ["email"]
         extra_contains = [
             ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
@@ -422,7 +439,7 @@ class PaymentFields(IStepActor):
             if flag or not continue_btns:
                 forward_btns = find_buttons_or_links(driver, ["bill", "proceed"])
                 if not forward_btns:
-                    logger.debug('Step over error')
+                    logger.debug("Step over error")
                     return False
                 forward_btns[len(forward_btns) - 1].click()
             time.sleep(2)
@@ -438,11 +455,13 @@ class PaymentFields(IStepActor):
 
         order_attribute = nlp.get_element_attribute(order[0])
         order[0].click()
+        time.sleep(2)
 
-        if order_attribute[0] == "value":
-            time.sleep(3)
+        if order_attribute[0] != "value":
+            if wait_until_attribute_disappear(driver, order_attribute[0], order_attribute[1]):
+                logger.debug("Order element is disappeared")
         else:
-            return nlp.wait_until_attribute_disappear(order_attribute[0], order_attribute[1])
+            time.sleep(2)
 
         '''paying if payment info is not inputed'''
         if payment_url:
@@ -460,10 +479,11 @@ class PaymentFields(IStepActor):
 
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
-
+        logger = logging.getLogger("shop_crawler")
         if password_fields:
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
+                    logger.debug("We can't use this url! Login password required!")
                     return False
         return True
 

@@ -23,12 +23,15 @@ sample_urls = random.sample(all_urls, 100)
 
 # Some good urls to analyze by hands
 good_urls = [
+    'shop.lifesmokevapors.com',
+    'www.vapininthecape.com',
     'jonessurgical.com',
+    'docssmokeshop.com',
+    'www.vaporsupply.com',
     'firstfitness.com',
     'srandd.com',
     'theglamourshop.com',
     'store.sandlakedermatology.com',
-    'sandlakedermatology.com',
     'docssmokeshop.com',
     'dixieems.com',
     'srandd.com',

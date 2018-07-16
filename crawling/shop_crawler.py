@@ -216,7 +216,7 @@ class ShopCrawler:
         return 'http://' + url
     
     @staticmethod
-    def get(driver, url, timeout=10):
+    def get(driver, url, timeout=15):
         try:
             driver.get(url)
             response = requests.get(url, verify=False, timeout=timeout)

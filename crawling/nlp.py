@@ -53,22 +53,6 @@ def get_element_attribute(element):
 
     return None
 
-def wait_until_attribute_disappear(attr_type, attr_name):
-    try:
-        if attr_type == "id":
-            element = WebDriverWait(driver, 5).until(
-                EC.invisibility_of_element_located((By.ID, attr_name))
-            )
-        elif attr_type == "name":
-                element = WebDriverWait(driver, 5).until(
-                    EC.invisibility_of_element_located((By.NAME, attr_name))
-                )
-    except TimeoutException:
-        print('The element does not disappear')
-        return False
-
-    return True
-
 def check_if_empty_cart(text):
     contains = ['cart is empty', 
                 'no .*in .*cart',
