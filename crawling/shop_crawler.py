@@ -26,22 +26,22 @@ class States:
 
     states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
 
-    
+
 class ICrawlingStatus:
     """
         Status of Shop crawling
     """
-    def __init__(self, 
-                 url, 
-                 status, 
-                 message = None, 
-                 limit = 60, 
-                 redirected_to_domain = None, 
+    def __init__(self,
+                 url,
+                 status,
+                 message = None,
+                 limit = 60,
+                 redirected_to_domain = None,
                  state = None,
                  exception = None,
                  chain_urls = None
                 ):
-        
+
         self.url = url
         self.status = status
         self.message = message
@@ -50,13 +50,13 @@ class ICrawlingStatus:
         self.state = state
         self.exception = exception,
         self.chain_urls = chain_urls
-        
+
     def __str__(self):
         if self.message:
             return 'Status: "{}" after processing url "{}"\n {}'.format(self.status, self.url, self.message)
         else:
             return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
-            
+
 
 class NotAvailable(ICrawlingStatus):
     """
@@ -77,7 +77,7 @@ class Timeout(ICrawlingStatus):
     def __init__(self, url, limit, message = None):
         super().__init__(url, "Time Out", message = message)
         self.limit = limit
-        
+
 class ProcessingStatus(ICrawlingStatus):
     def __init__(self, url, chain_urls, state, exception = None, message = None):
         super().__init__(url, 'Processing Finished at State',
@@ -112,18 +112,44 @@ class UserInfo:
         self.phone = phone
         self.email = email
 
+    def get_json_userinfo(self):
+        return {
+            "first name": self.first_name,
+            "last name": self.last_name,
+            "country": self.country,
+            "state": self.state,
+            "home": self.home,
+            "street": self.street,
+            "zip": self.zip,
+            "city": self.city,
+            "phone": self.phone,
+            "email": self.email,
+        }
+
 
 class PaymentInfo:
     def __init__(self,
                  card_number,
+                 card_name,
+                 card_type,
                  expire_date_year,
                  expire_date_month,
                  cvc
                  ):
         self.card_number = card_number
+        self.card_name = card_name
+        self.card_type = card_type
         self.expire_date_year = expire_date_year
         self.expire_date_month = expire_date_month
         self.cvc = cvc
+
+    def get_json_paymentinfo(self):
+        return {
+            "number": self.card_number,
+            "name": self.card_name,
+            "type": self.card_type,
+            "cvc": self.cvc,
+        }
 
 
 class StepContext:
@@ -180,7 +206,7 @@ class ShopCrawler:
     def __exit__(self, type, value, traceback):
         if self._driver:
             self._driver.quit()
-            
+
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -209,24 +235,22 @@ class ShopCrawler:
             
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
-    
-    
+  
     def close_popus_if_appeared(self):
         close_alert_if_appeared(self._driver)
-        try_handle_popups(self._driver)    
-            
+        try_handle_popups(self._driver)                
         
     def get_driver(self, timeout=60):
         if self._driver:
             self._driver.quit()
-            
+
         driver = create_chrome_driver(self._chrome_path, self._headless)
         driver.set_page_load_timeout(timeout)
-        
+
         self._driver = driver
-        
+
         return driver
-    
+
     def process_state(self, driver, state, context):
         # Close popups if appeared
         self.close_popus_if_appeared()
@@ -237,7 +261,7 @@ class ShopCrawler:
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
-        
+
         for priority, handler in handlers:
             self._logger.info('handler {}'.format(handler))
             new_state = handler.act(driver, state, context)
@@ -256,28 +280,28 @@ class ShopCrawler:
             Crawls shop in domain
             Returns ICrawlingStatus
         """
-        
+
         result = None
         best_state_idx = -1
         for attempt in range(attempts):
             attempt_result = self.do_crawl(domain, wait_response_seconds)
-            
+
             if isinstance(attempt_result, ProcessingStatus):
                 idx = States.states.index(attempt_result.state)
                 if idx > best_state_idx:
                     best_state_idx = idx
                     result = attempt_result
-                
+
                 # Don't need randomization if we have already navigated to checkout page
                 if idx >= States.states.index(States.checkout_page):
                     break
-                
+
             if not result:
                 result = attempt_result
-                
+
         return result
-    
-    
+
+
     def do_crawl(self, domain, wait_response_seconds = 60):
 
         url = ShopCrawler.normalize_url(domain)
@@ -286,16 +310,16 @@ class ShopCrawler:
 
         driver = self.get_driver()
         state = States.new
-        
+
         try:
             status = ShopCrawler.get(driver, url, wait_response_seconds)
-            
+
             if status:
                 return status
-            
+
             if is_domain_for_sale(driver, domain):
                 return NotAvailable(url, message = 'Domain {} for sale'.format(domain))
-            
+
             new_state = state
 
             while state != States.purchased:
@@ -303,10 +327,10 @@ class ShopCrawler:
                 
                 if driver.current_url != chain_urls[-1]:
                     chain_urls.append(driver.current_url)
-                    
+
                 if len(frames) > 1:
                     self._logger.info('found {} frames'.format(len(frames) - 1))
-                   
+
                 last_url = driver.current_url
                 
                 frames_number = len(frames)
@@ -323,14 +347,14 @@ class ShopCrawler:
                         new_state = self.process_state(driver, state, context)
                         if new_state != state or last_url != driver.current_url:
                             break
-                
+
                 if state == new_state:
                     return ProcessingStatus(domain, chain_urls, state)
-                    
+
                 state = new_state
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
             exception = traceback.format_exc()
             return ProcessingStatus(domain, chain_urls, state, exception=exception)
-            
+
         return ProcessingStatus(domain, chain_urls, state)

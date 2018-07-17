@@ -48,7 +48,14 @@ def close_alert_if_appeared(driver):
         logger = logging.getLogger('shop_crawler')
         logger.info('found alert with text {}'.format(alert.text))
         alert.dismiss()
-    
+
+
+def to_string(element):
+    try:
+        return element.get_attribute("outerHTML")
+    except:
+        return str(element)
+
     
 def get_page_text(driver):
     html = driver.page_source
@@ -79,7 +86,18 @@ def close_tab(driver):
     driver.close()
     driver.switch_to_window(handles[-2])
 
-    
+
+def get_element_attribute(element):
+    if element.get_attribute('id'):
+        return ['id', element.get_attribute('id')]
+    elif element.get_attribute('name'):
+        return ['name', element.get_attribute('name')]
+    elif element.get_attribute('value'):
+        return ['value', element.get_attribute('value')]
+
+    return None
+
+
 def create_chrome_driver(chrome_path, headless=True):
     options = webdriver.ChromeOptions()
     if headless:

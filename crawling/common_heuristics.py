@@ -8,7 +8,22 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
 
-def find_links(driver, contains=None, not_contains=None, by_path=False, by_text = False):
+def find_radio_or_checkout_button(driver,
+                                  contains=None,
+                                  not_contains=None):
+    radiobtns = driver.find_elements_by_css_selector("input[type='radio']")
+    checkbtns = driver.find_elements_by_css_selector("input[type='checkbox']")
+
+    result = []
+    for elem in radiobtns + checkbtns:
+        text = elem.get_attribute("outerHTML")
+        if nlp.check_text(text, contains, not_contains):
+            result.append(elem)
+    
+    return result
+
+
+def find_links(driver, contains=None, not_contains=None):
     links = driver.find_elements_by_css_selector("a[href]")
     result = []
     for link in links:
@@ -16,16 +31,10 @@ def find_links(driver, contains=None, not_contains=None, by_path=False, by_text 
             continue
 
         href = link.get_attribute("href")
-        if driver.current_url == href:
+        if driver.current_url == href or not href:
             continue
 
-        if by_path:
-            text = link.get_attribute("href")
-        elif by_text:
-            text = link.get_attribute("innerHTML")            
-        else:
-            text = link.get_attribute("outerHTML")
-
+        text = link.get_attribute("outerHTML")
         if nlp.check_text(text, contains, not_contains):
             result.append(link)
 
@@ -53,12 +62,6 @@ def find_buttons_or_links(driver,
             result.append(elem)
 
     return result
-
-def to_string(element):
-    try:
-        return element.get_attribute("outerHTML")
-    except:
-        return str(element)
 
 
 def click_first(driver, elements, on_error=None, randomize = False):
@@ -107,6 +110,8 @@ def click_first(driver, elements, on_error=None, randomize = False):
             logger.debug('clicking again')
             clicked = process(element)
             logger.debug('result: {}'.format(clicked))
+            if clicked:
+                return True
 
     return False
 
