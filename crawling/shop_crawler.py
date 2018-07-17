@@ -11,6 +11,8 @@ import selenium
 import nlp
 from common_heuristics import *
 
+from selenium.webdriver.support.expected_conditions import staleness_of
+
 
 class States:
     new = "new"
@@ -56,6 +58,22 @@ class ICrawlingStatus:
             return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
 
 
+class CheckoutUrlsInfo:
+    """
+        Save working urls
+    """
+    list_urls = []
+    filling_checkout_status = {}
+
+    @staticmethod
+    def save_urls(url, status=False):
+        if url in list_urls:
+            self.filling_checkout_status[url]=status
+            return
+        self.list_urls.append(url)
+        self.filling_checkout_status[url]=status
+
+
 class NotAvailable(ICrawlingStatus):
     """
         Status for shop that are not available
@@ -84,7 +102,6 @@ class ProcessingStatus(ICrawlingStatus):
                          chain_urls = chain_urls,
                          message = message
                         )
-
 
 class UserInfo:
     def __init__(self,
@@ -203,7 +220,6 @@ class ShopCrawler:
     
     def __exit__(self, type, value, traceback):
         if self._driver:
-            self.close_alert_if_appeared()
             self._driver.quit()
 
 
@@ -234,15 +250,11 @@ class ShopCrawler:
             
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
-
-
-    def close_alert_if_appeared(self):
-        alert = find_alert(self._driver)
-        if alert:
-            self._logger.info('found alert with text {}'.format(alert.text))
-            alert.dismiss()
-
-
+  
+    def close_popus_if_appeared(self):
+        close_alert_if_appeared(self._driver)
+        try_handle_popups(self._driver)                
+        
     def get_driver(self, timeout=60):
         if self._driver:
             self._driver.quit()
@@ -255,9 +267,9 @@ class ShopCrawler:
         return driver
 
     def process_state(self, driver, state, context):
-        # Close Alert if appeared
-        self.close_alert_if_appeared()
-
+        # Close popups if appeared
+        self.close_popus_if_appeared()
+            
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
 
@@ -266,11 +278,9 @@ class ShopCrawler:
         self._logger.info('processing state: {}'.format(state))
 
         for priority, handler in handlers:
-            # Close Alert if appeared
-            self.close_alert_if_appeared()
-
             self._logger.info('handler {}'.format(handler))
             new_state = handler.act(driver, state, context)
+            self.close_popus_if_appeared()
             self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
 
             assert new_state is not None, "new_state is None"
@@ -328,8 +338,8 @@ class ShopCrawler:
             new_state = state
 
             while state != States.purchased:
-                frames = [None] + driver.find_elements_by_tag_name("iframe")
-
+                frames = get_frames(driver)
+                
                 if driver.current_url != chain_urls[-1]:
                     chain_urls.append(driver.current_url)
 
@@ -337,7 +347,17 @@ class ShopCrawler:
                     self._logger.info('found {} frames'.format(len(frames) - 1))
 
                 last_url = driver.current_url
-                for frame in frames:
+                
+                frames_number = len(frames)
+                for i in range(frames_number):
+                    if len(frames) > 1 and staleness_of(frames[-1]):
+                        frames = get_frames(driver)
+                    
+                    if len(frames) <= i:
+                        break
+                        
+                    frame = frames[i]
+                    
                     with Frame(driver, frame):
                         new_state = self.process_state(driver, state, context)
                         if new_state != state or last_url != driver.current_url:
