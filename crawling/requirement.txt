@@ -1,0 +1,3 @@
+wrapt
+requests
+lxml

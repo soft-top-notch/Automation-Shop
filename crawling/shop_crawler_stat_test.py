@@ -23,14 +23,16 @@ sample_urls = random.sample(all_urls, 100)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'curlebotanicals.com',
-    'theglamourshop.com',
-    'vape-fuel.com',
-    'firstfitness.com',
-    'sandlakedermatology.com',
-    'getwaave.com',
-    'dixieems.com',
+    'docssmokeshop.com',
+    'www.vapininthecape.com',
     'jonessurgical.com',
+    'www.vaporsupply.com',
+    'firstfitness.com',
+    'srandd.com',
+    'theglamourshop.com',
+    'store.sandlakedermatology.com',
+    'docssmokeshop.com',
+    'dixieems.com',
     'srandd.com',
     'ambarygardens.com',
     'anabolicwarfare.com'
@@ -45,32 +47,33 @@ user_info = UserInfo(
     street = 'Ocean drive',
     city = 'Miami',
     zip = '33125',
-    state = 'FLorida',
-    
+    state = 'Florida',
     phone = '1231232',
     email = 'john@service.com'
 )
 
 billing_info = PaymentInfo(
     card_number = '1413232312312321',
+    card_name = 'Visa Card',
+    card_type = 'Visa',
     expire_date_year = 2020,
     expire_date_month = 12,
     cvc = '123'
 )
 
 
-selenium_path = '/home/aleksei/dist/selenium/chromedriver'
+selenium_path = '/usr/bin/chromedriver'
 
 @contextmanager
 def get_crawler(headless=True):
     global user_info, billing_info, selinium_path
     crawler = ShopCrawler(user_info, billing_info, selenium_path, headless=headless)
     common_actors.add_crawler_extensions(crawler)
-    
+
     yield crawler
 
 def get_driver(headless=True):
-    global selenium_path   
+    global selenium_path
     return create_chrome_driver(selenium_path, headless=headless)
 
 
@@ -95,5 +98,5 @@ states = {}
 for status in results:
     if isinstance(status, ProcessingStatus):
         states[status.state] = states.get(status.state, 0) + 1
-        
+
 print(states)

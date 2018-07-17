@@ -10,7 +10,7 @@ def normalize_text(text):
 def tokenize(text):
     return re.split(r'(\d+|\W+)', text)
 
-def check_text(text, contains, not_contains, normalize=True):
+def check_text(text, contains, not_contains=None, normalize=True):
     if not contains:
         contains = []
 
@@ -38,8 +38,15 @@ def check_text(text, contains, not_contains, normalize=True):
     return not has_forbidden
 
 
+def remove_elements(text, contains):
+    strName = text
+    for elem in contains:
+        strName=strName.replace(elem, "")
+    return strName
+
+
 def check_if_empty_cart(text):
-    contains = ['(cart|bag) is empty', 
+    contains = ['(cart|bag) is empty',
             'zero (products|items|tickets) in (cart|bag)',
             'zero (products|items|tickets) in .\w* (cart|bag)',
             'no (products|items|tickets) in (cart|bag)',

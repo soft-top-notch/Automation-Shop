@@ -63,7 +63,18 @@ def close_tab(driver):
     driver.close()
     driver.switch_to_window(handles[-2])
 
-    
+
+def get_element_attribute(element):
+    if element.get_attribute('id'):
+        return ['id', element.get_attribute('id')]
+    elif element.get_attribute('name'):
+        return ['name', element.get_attribute('name')]
+    elif element.get_attribute('value'):
+        return ['value', element.get_attribute('value')]
+
+    return None
+
+
 def create_chrome_driver(chrome_path, headless=True):
     options = webdriver.ChromeOptions()
     if headless:
@@ -83,5 +94,6 @@ def create_chrome_driver(chrome_path, headless=True):
 def back(driver):
      driver.execute_script("window.history.go(-1)")
 
-def find_alert(driver):    
+
+def find_alert(driver):
     return alert_is_present()(driver)
