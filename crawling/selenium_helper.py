@@ -6,6 +6,7 @@ import traceback
 import wrapt
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
+from selenium.webdriver.support.expected_conditions import staleness_of
 
 
 class Frame:
@@ -23,7 +24,7 @@ class Frame:
             url = self.driver.current_url
             
             # ToDo Do checks without ancors
-            if url == self.url:
+            if url == self.url and not staleness_of(self.frame):
                 self.driver.switch_to.default_content()
 
 def can_click(element):
@@ -31,7 +32,22 @@ def can_click(element):
         return element.is_enabled() and element.is_displayed()
     except WebDriverException:
         logger = logging.getLogger('shop_crawler')
+        exception = traceback.format_exc()
+        logger.debug('during check if can click exception was thrown {}'.format(exception))
+        
         return False
+
+
+def find_alert(driver):    
+    return alert_is_present()(driver)
+
+
+def close_alert_if_appeared(driver):
+    alert = find_alert(driver)
+    if alert:
+        logger = logging.getLogger('shop_crawler')
+        logger.info('found alert with text {}'.format(alert.text))
+        alert.dismiss()
     
     
 def get_page_text(driver):
@@ -82,6 +98,9 @@ def create_chrome_driver(chrome_path, headless=True):
 
 def back(driver):
      driver.execute_script("window.history.go(-1)")
+        
+def get_frames(driver):
+    return [None] + \
+        driver.find_elements_by_tag_name("iframe") + \
+        driver.find_elements_by_tag_name("frame")
 
-def find_alert(driver):    
-    return alert_is_present()(driver)

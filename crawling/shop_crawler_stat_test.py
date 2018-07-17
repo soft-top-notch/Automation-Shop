@@ -75,7 +75,7 @@ def get_driver(headless=True):
 
 
 logger = logging.getLogger('shop_crawler')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -86,10 +86,11 @@ logger.addHandler(handler)
 results = []
 with get_crawler(headless=False) as crawler:
     for url in sample_urls:
-        print('\n\n{}'.format(url))
-        status = crawler.crawl(url, 30, attempts=1)
-        print(status)
+        logger.info('\n\nstarted url: {}'.format(url))
+        status = crawler.crawl(url, 60, attempts=1)
         results.append(status)
+        logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
+
 
 states = {}
 for status in results:
