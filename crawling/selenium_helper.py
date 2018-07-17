@@ -63,12 +63,6 @@ def close_tab(driver):
     driver.close()
     driver.switch_to_window(handles[-2])
 
-def remove_elements(text, contains):
-    strName = text
-    for elem in contains:
-        strName=strName.replace(elem, "")
-    return strName
-
 
 def get_element_attribute(element):
     if element.get_attribute('id'):
