@@ -316,7 +316,6 @@ class PaymentFields(IStepActor):
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
         logger = logging.getLogger("shop_crawler")
-        CheckoutUrlsInfo.save_urls(driver.current_url)
         if password_fields:
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
@@ -547,7 +546,6 @@ class PaymentFields(IStepActor):
             )
             return self.click_one_element(pay_button)
 
-        CheckoutUrlsInfo.save_urls(driver.current_url, True)
         return True
 
     def process_page(self, driver, state, context):
