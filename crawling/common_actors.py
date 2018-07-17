@@ -44,16 +44,21 @@ def find_in_elements(driver, elements, contains=None, not_contains=None, check_o
 
 def find_buttons_or_links(driver,
                           contains=None,
-                          not_contains=None
+                          not_contains=None,
+                          not_link=None
                          ):
     links = driver.find_elements_by_css_selector("a[href]")
     buttons = driver.find_elements_by_css_selector("button")
     inputs = driver.find_elements_by_css_selector('input[type="button"]')
     submits = driver.find_elements_by_css_selector('input[type="submit"]')
 
+    elements = buttons + inputs + submits
+
+    if not not_link:
+        elements += links
     # Yield isn't good because context can change
 
-    return find_in_elements(driver,(links + buttons + inputs + submits), contains, not_contains)
+    return find_in_elements(driver, elements, contains, not_contains)
 
 
 def find_radio_or_checkout_button(driver,
@@ -91,6 +96,7 @@ def click_first(driver, elements, on_error=None, randomize = False):
 
             old_windows = len(driver.window_handles)
             element.click()
+            time.sleep(1)
             new_windows = len(driver.window_handles)
 
             if new_windows > old_windows:
@@ -307,6 +313,18 @@ class PaymentFields(IStepActor):
     def find_auth_pass_elements(self, driver):
         return find_radio_or_checkout_button(driver, ["guest", "create*.*later"])
 
+    def filter_page(self, driver, state, content):
+        password_fields = self.find_pwd_in_checkout(driver)
+        logger = logging.getLogger("shop_crawler")
+        CheckoutUrlsInfo.save_urls(driver.current_url)
+        if password_fields:
+            if password_fields[0].is_displayed():
+                if not self.find_auth_pass_elements(driver):
+                    logger.debug("We can't use this url! Login password required!")
+                    return False
+
+        return True
+
     def get_label_text_with_attribute(self, driver, elem):
         label_txt = ""
         element_attribute = get_element_attribute(elem)
@@ -461,8 +479,10 @@ class PaymentFields(IStepActor):
         while True:
             order = find_buttons_or_links(
                 driver,
-                ["confirm*.*order", "place*.*order", "pay*.*order"]
+                ["order", "checkout"],
+                not_link=True
             )
+
             agree_btns = find_radio_or_checkout_button(
                 driver,
                 ["agree", "terms", "paypal"],
@@ -527,16 +547,7 @@ class PaymentFields(IStepActor):
             )
             return self.click_one_element(pay_button)
 
-        return True
-
-    def filter_page(self, driver, state, content):
-        password_fields = self.find_pwd_in_checkout(driver)
-        logger = logging.getLogger("shop_crawler")
-        if password_fields:
-            if password_fields[0].is_displayed():
-                if not self.find_auth_pass_elements(driver):
-                    logger.debug("We can't use this url! Login password required!")
-                    return False
+        CheckoutUrlsInfo.save_urls(driver.current_url, True)
         return True
 
     def process_page(self, driver, state, context):
