@@ -4,19 +4,17 @@ from common_heuristics import *
 
 import nlp
 import random
-
+import sys
+import traceback
+import time
+import calendar
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import ElementNotVisibleException
-import sys
-import traceback
-import time
-import calendar
+from selenium.common.exceptions import ElementNotVisibleException, TimeoutException
 
 
 def wait_until_attribute_disappear(driver, attr_type, attr_name):
@@ -199,12 +197,11 @@ class PaymentFields(IStepActor):
         return pwd_inputs
 
     def find_auth_pass_elements(self, driver):
-        return find_radio_or_checkout_button(driver, ["guest", "create*.*later"])
+        return find_radio_or_checkbox_buttons(driver, ["guest", "create*.*later"])
 
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
         logger = logging.getLogger("shop_crawler")
-        CheckoutUrlsInfo.save_urls(driver.current_url)
         if password_fields:
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
@@ -220,9 +217,9 @@ class PaymentFields(IStepActor):
         if element_attribute:
             label = driver.find_elements_by_css_selector("label[for='%s']" % element_attribute[1])
             if label:
-                label_txt = remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
+                label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
             else:
-                label_txt = remove_elements(
+                label_txt = nlp.remove_elements(
                     element_attribute[1],
                     ["/", "*", "-", "_", ":", " "]
                 ).lower()
@@ -304,7 +301,7 @@ class PaymentFields(IStepActor):
                     label_text = conItem[1]
                     break
             for key in json_Info.keys():
-                if nlp.check_text(label_text, [remove_elements(key, [" "])]):
+                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]):
                     try:
                         elem.click()
                         elem.send_keys(json_Info[key])
@@ -365,13 +362,12 @@ class PaymentFields(IStepActor):
         payment_url = None
 
         while True:
-            order = find_buttons_or_links(
+            order = find_buttons(
                 driver,
-                ["order", "checkout"],
-                not_link=True
+                ["order", "checkout"]
             )
 
-            agree_btns = find_radio_or_checkout_button(
+            agree_btns = find_radio_or_checkbox_buttons(
                 driver,
                 ["agree", "terms", "paypal"],
                 ["express"]
@@ -435,7 +431,6 @@ class PaymentFields(IStepActor):
             )
             return self.click_one_element(pay_button)
 
-        CheckoutUrlsInfo.save_urls(driver.current_url, True)
         return True
 
     def process_page(self, driver, state, context):

@@ -8,7 +8,7 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
 
-def find_radio_or_checkout_button(driver,
+def find_radio_or_checkbox_buttons(driver,
                                   contains=None,
                                   not_contains=None):
     radiobtns = driver.find_elements_by_css_selector("input[type='radio']")
@@ -23,15 +23,32 @@ def find_radio_or_checkout_button(driver,
     return result
 
 
+def normalize_url(url):
+    if not url:
+        return url
+    
+    return url[:url.index('#')] if '#' in url else url
+
+
+def is_link(driver, elem):
+    try:
+        href = elem.get_attribute('href')
+        href = normalize_url(href)
+        return href and not href.startswith('javascript:') and href != driver.current_url
+    except:
+        logger = logging.getLogger('shop_crawler')
+        logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
+        return False
+
+
 def find_links(driver, contains=None, not_contains=None):
     links = driver.find_elements_by_css_selector("a[href]")
     result = []
     for link in links:
-        if not can_click(link):
+        if not can_click(link) or not is_link(driver, link):
             continue
 
-        href = link.get_attribute("href")
-        if driver.current_url == href or not href:
+        if driver.current_url == link.get_attribute("href"):
             continue
 
         text = link.get_attribute("outerHTML")
@@ -41,11 +58,9 @@ def find_links(driver, contains=None, not_contains=None):
     return result
 
 
-def find_buttons_or_links(driver,
-                          contains=None,
-                          not_contains=None
-                         ):
-    links = driver.find_elements_by_tag_name("a")
+def find_buttons(driver, contains=None, not_contains=None):
+    
+    links = [elem for elem in driver.find_elements_by_tag_name("a") if not is_link(driver, elem)]
     buttons = driver.find_elements_by_tag_name("button")
     inputs = driver.find_elements_by_css_selector('input[type="button"]')
     submits = driver.find_elements_by_css_selector('input[type="submit"]')
@@ -53,7 +68,7 @@ def find_buttons_or_links(driver,
 
     # Yield isn't good because context can change
     result = []
-    for elem in links + buttons + inputs + submits:
+    for elem in links + buttons + inputs + submits + links + imgs:
         if not can_click(elem):
             continue
 
@@ -64,12 +79,16 @@ def find_buttons_or_links(driver,
     return result
 
 
+def find_buttons_or_links(driver, contains=None, not_contains=None):
+    return find_links(driver, contains, not_contains) + \
+            find_buttons(driver, contains, not_contains)
+
 def click_first(driver, elements, on_error=None, randomize = False):
     def process(element):
         try:
             # process links by opening url
             href = element.get_attribute("href")
-            if href and driver.current_url != href and not href.startswith('javascript:'):
+            if is_link(driver, element):
                 driver.get(href)
                 return True
 
@@ -128,7 +147,7 @@ def is_domain_for_sale(driver, domain):
 
 
 def try_handle_popups(driver):
-    btns = find_buttons_or_links(driver, ["i .*over", "i .*age", "agree", "accept"], ["not ", "under "])
+    btns = find_buttons_or_links(driver, ["i (.* |)over", "i (.* |)age", "agree", "accept"], ["not ", "under "])
     result = click_first(driver, btns)
     if result:
         time.sleep(2)
