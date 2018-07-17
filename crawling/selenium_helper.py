@@ -1,13 +1,12 @@
 from selenium import webdriver
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import WebDriverException
 import logging
 import traceback
 import wrapt
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of
-
+from selenium.common.exceptions import WebDriverException, TimeoutException
 
 class Frame:
     def __init__(self, driver, frame=None):
@@ -96,6 +95,23 @@ def get_element_attribute(element):
         return ['value', element.get_attribute('value')]
 
     return None
+
+
+def wait_until_attribute_disappear(driver, attr_type, attr_name):
+    try:
+        if attr_type == "id":
+            element = WebDriverWait(driver, 3).until(
+                EC.invisibility_of_element_located((By.ID, attr_name))
+            )
+        elif attr_type == "name":
+                element = WebDriverWait(driver, 3).until(
+                    EC.invisibility_of_element_located((By.NAME, attr_name))
+                )
+    except TimeoutException:
+        print('The element does not disappear')
+        return False
+
+    return True
 
 
 def create_chrome_driver(chrome_path, headless=True):

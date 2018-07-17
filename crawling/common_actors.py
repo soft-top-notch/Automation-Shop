@@ -4,36 +4,17 @@ from common_heuristics import *
 
 import nlp
 import random
-
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-
-from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import ElementNotVisibleException
 import sys
 import traceback
 import time
 import calendar
 
-
-def wait_until_attribute_disappear(driver, attr_type, attr_name):
-    try:
-        if attr_type == "id":
-            element = WebDriverWait(driver, 2).until(
-                EC.invisibility_of_element_located((By.ID, attr_name))
-            )
-        elif attr_type == "name":
-                element = WebDriverWait(driver, 2).until(
-                    EC.invisibility_of_element_located((By.NAME, attr_name))
-                )
-    except TimeoutException:
-        print('The element does not disappear')
-        return False
-
-    return True
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import ElementNotVisibleException, TimeoutException
 
 
 class ToProductPageLink(IStepActor):
@@ -199,7 +180,7 @@ class PaymentFields(IStepActor):
         return pwd_inputs
 
     def find_auth_pass_elements(self, driver):
-        return find_radio_or_checkout_button(driver, ["guest", "create*.*later"])
+        return find_radio_or_checkbox_buttons(driver, ["guest", "create*.*later"])
 
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
@@ -219,9 +200,9 @@ class PaymentFields(IStepActor):
         if element_attribute:
             label = driver.find_elements_by_css_selector("label[for='%s']" % element_attribute[1])
             if label:
-                label_txt = remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
+                label_txt = nlp.remove_elements(label[0].text, ["/", "*", "-", "_", ":", " "]).lower()
             else:
-                label_txt = remove_elements(
+                label_txt = nlp.remove_elements(
                     element_attribute[1],
                     ["/", "*", "-", "_", ":", " "]
                 ).lower()
@@ -303,7 +284,7 @@ class PaymentFields(IStepActor):
                     label_text = conItem[1]
                     break
             for key in json_Info.keys():
-                if nlp.check_text(label_text, [remove_elements(key, [" "])]):
+                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]):
                     try:
                         elem.click()
                         elem.send_keys(json_Info[key])
@@ -364,13 +345,12 @@ class PaymentFields(IStepActor):
         payment_url = None
 
         while True:
-            order = find_buttons_or_links(
+            order = find_buttons(
                 driver,
-                ["order", "checkout"],
-                not_link=True
+                ["order", "checkout"]
             )
 
-            agree_btns = find_radio_or_checkout_button(
+            agree_btns = find_radio_or_checkbox_buttons(
                 driver,
                 ["agree", "terms", "paypal"],
                 ["express"]
@@ -439,6 +419,8 @@ class PaymentFields(IStepActor):
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
         auth_pass = self.find_auth_pass_elements(driver)
+        import pdb;
+        pdb.set_trace()
         if auth_pass:
             #create an account as guest....
             if not click_first(driver, auth_pass):
