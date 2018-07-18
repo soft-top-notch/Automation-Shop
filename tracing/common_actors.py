@@ -376,9 +376,11 @@ class PaymentFields(IStepActor):
         while True:
             order = find_buttons(
                 driver,
-                ["order", "checkout"]
+                ["order", "checkout"],
+                ["add", "modify", "coupon", "express"]
             )
 
+            order = [elem for elem in order if elem.get_attribute("href") != driver.current_url]
             agree_btns = find_radio_or_checkbox_buttons(
                 driver,
                 ["agree", "terms", "paypal"],
@@ -406,7 +408,7 @@ class PaymentFields(IStepActor):
                     flag = True
                     pass
             if flag or not continue_btns:
-                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"])
+                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express"])
                 if not forward_btns:
                     logger.debug("Step over error")
                     return False
