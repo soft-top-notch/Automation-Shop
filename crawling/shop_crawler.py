@@ -58,22 +58,6 @@ class ICrawlingStatus:
             return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
 
 
-class CheckoutUrlsInfo:
-    """
-        Save working urls
-    """
-    list_urls = []
-    filling_checkout_status = {}
-
-    @staticmethod
-    def save_urls(url, status=False):
-        if url in list_urls:
-            self.filling_checkout_status[url]=status
-            return
-        self.list_urls.append(url)
-        self.filling_checkout_status[url]=status
-
-
 class NotAvailable(ICrawlingStatus):
     """
         Status for shop that are not available
@@ -207,6 +191,7 @@ class ShopCrawler:
                  headless=True
                  ):
         self._handlers = []
+        self._analyzer = None
         self._user_info = user_info
         self._payment_info = payment_info
         self._chrome_path = chrome_path
@@ -222,6 +207,8 @@ class ShopCrawler:
         if self._driver:
             self._driver.quit()
 
+    def init_analyzer(self, analyzer):
+        self._analyzer = analyzer
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -272,6 +259,12 @@ class ShopCrawler:
             
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
+
+        if state == States.checkout_page:
+            if not handlers:
+                self._analyzer.save_urls(context.domain)
+            else:
+                self._analyzer.save_urls(context.domain, True)
 
         handlers.sort(key=lambda p: -p[0])
 

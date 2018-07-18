@@ -347,9 +347,11 @@ class PaymentFields(IStepActor):
         while True:
             order = find_buttons(
                 driver,
-                ["order", "checkout"]
+                ["order", "checkout"],
+                ["add", "modify", "coupon", "express"]
             )
 
+            order = [elem for elem in order if elem.get_attribute("href") != driver.current_url]
             agree_btns = find_radio_or_checkbox_buttons(
                 driver,
                 ["agree", "terms", "paypal"],
@@ -377,7 +379,7 @@ class PaymentFields(IStepActor):
                     flag = True
                     pass
             if flag or not continue_btns:
-                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"])
+                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express"])
                 if not forward_btns:
                     logger.debug("Step over error")
                     return False
@@ -396,7 +398,7 @@ class PaymentFields(IStepActor):
         order[0].click()
         time.sleep(2)
 
-        if order_attribute[0] != "value":
+        if order_attribute and order_attribute[0] != "value":
             if wait_until_attribute_disappear(driver, order_attribute[0], order_attribute[1]):
                 logger.debug("Order element is disappeared")
         else:
@@ -419,8 +421,7 @@ class PaymentFields(IStepActor):
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
         auth_pass = self.find_auth_pass_elements(driver)
-        import pdb;
-        pdb.set_trace()
+
         if auth_pass:
             #create an account as guest....
             if not click_first(driver, auth_pass):

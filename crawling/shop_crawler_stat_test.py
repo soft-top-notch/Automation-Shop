@@ -5,6 +5,7 @@ import logging
 from shop_crawler import *
 from selenium_helper import *
 import common_actors
+from analyzing_checkout import CheckoutUrlsInfo
 
 from contextlib import contextmanager
 
@@ -19,23 +20,23 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
 
 # Random sample urls
 random.seed(4)
-sample_urls = random.sample(all_urls, 100)
+sample_urls = random.sample(all_urls, 20)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'docssmokeshop.com',
+    'theglamourshop.com',
+    'firstfitness.com',
+    'ambarygardens.com',
+    'anabolicwarfare.com'
     'vapininthecape.com',
     'jonessurgical.com',
     'vaporsupply.com',
-    'firstfitness.com',
     'srandd.com',
-    'theglamourshop.com',
+    'docssmokeshop.com',
     'sandlakedermatology.com',
     'docssmokeshop.com',
     'dixieems.com',
     'srandd.com',
-    'ambarygardens.com',
-    'anabolicwarfare.com'
 ]
 
 
@@ -87,14 +88,17 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 results = []
+url_analyzer = CheckoutUrlsInfo()
+
 with get_crawler(headless=False) as crawler:
-    for url in good_urls:
+    for url in sample_urls:
         logger.info('\n\nstarted url: {}'.format(url))
+        crawler.init_analyzer(url_analyzer)
         status = crawler.crawl(url, 60, attempts=1)
         results.append(status)
         logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
 
-
+url_analyzer.analyze_result()
 states = {}
 for status in results:
     if isinstance(status, ProcessingStatus):
