@@ -26,8 +26,8 @@ class CheckoutUrlsInfo:
     def save_in_csv(self, filepath):
         save_list = []
 
-        if list_urls:
-            for url in list_urls:
+        if self.list_urls:
+            for url in self.list_urls:
                 save_list.append([url])
         self.write_csvfile(filepath, save_list)
 
