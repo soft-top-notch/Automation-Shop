@@ -2,7 +2,6 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import logging
 import traceback
-import wrapt
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of
@@ -26,8 +25,13 @@ class Frame:
             url = self.driver.current_url
             
             # ToDo Do checks without ancors
-            if url == self.url and not staleness_of(self.frame):
+            if url == self.url and not is_stale(self.frame):
                 self.driver.switch_to.default_content()
+
+
+def is_stale(elem):
+    return staleness_of(elem)
+
 
 def can_click(element):
     try:
@@ -141,3 +145,10 @@ def get_frames(driver):
         driver.find_elements_by_tag_name("iframe") + \
         driver.find_elements_by_tag_name("frame")
 
+def get_screenshot(driver, file_to_save = None):
+    png = driver.get_screenshot_as_png()
+    if file_to_save:
+        with open(file_to_save, "wb") as file:
+            file.write(png)
+
+    return png
