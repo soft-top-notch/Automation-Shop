@@ -57,6 +57,25 @@ def find_links(driver, contains=None, not_contains=None):
 
     return result
 
+def find_sub_elements(driver, element, contains=None, not_contains=None):
+    links = [elem for elem in element.find_elements_by_tag_name("a") if not is_link(driver, elem)]
+    buttons = element.find_elements_by_tag_name("button")
+    inputs = element.find_elements_by_css_selector('input[type="button"]')
+    submits = element.find_elements_by_css_selector('input[type="submit"]')
+    imgs = element.find_elements_by_css_selector('input[type="image"]')
+
+    # Yield isn't good because context can change
+    result = []
+    for elem in links + buttons + inputs + submits + links + imgs:
+        if not can_click(elem):
+            continue
+
+        text = elem.get_attribute("outerHTML")
+        if nlp.check_text(text, contains, not_contains):
+            result.append(elem)
+
+    return result
+
 
 def find_buttons(driver, contains=None, not_contains=None):
     
@@ -134,7 +153,24 @@ def click_first(driver, elements, on_error=None, randomize = False):
 
     return False
 
+def find_text_element(driver, contains=None, not_contains=None):
+    label = driver.find_elements_by_tag_name('label')
+    h_elements = driver.find_elements_by_tag_name('h')
+    span = driver.find_elements_by_tag_name('span')
+    p = driver.find_elements_by_tag_name('p')
+    td = driver.find_elements_by_tag_name('td')
 
+    for ind in range(1,6):
+        h_elements += driver.find_elements_by_tag_name('h%s' % str(ind))
+
+    result = None
+    for elem in label + h_elements + span + p + td:
+        text = elem.get_attribute("outerHTML")
+
+        if nlp.check_text(text, contains, not_contains):
+            result = elem
+
+    return result
 
 def is_empty_cart(driver):
     text = get_page_text(driver)

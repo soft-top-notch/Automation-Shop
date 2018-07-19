@@ -209,12 +209,22 @@ class PaymentFields(IStepActor):
         return pwd_inputs
 
     def find_auth_pass_elements(self, driver):
-        return find_radio_or_checkbox_buttons(driver, ["guest", "create*.*later"])
+
+        radio_checkbox_btns = find_radio_or_checkbox_buttons(driver, ["guest", "create*.*later", "copy*.*ship", "copy*.*bill"])
+        if radio_checkbox_btns:
+            return radio_checkbox_btns
+        else:
+            text_element = find_text_element(driver, ["without*.*account", "guest*.*account", "account*.*guest"])
+            if text_element:
+                return find_sub_elements(driver, text_element.find_element_by_xpath("../.."), ["continue", "checkout"], ["login"])
+        return None
 
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
         logger = logging.getLogger("shop_tracer")
         if password_fields:
+            if len(password_fields) >= 2:
+                return True
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
                     logger.debug("We can't use this url! Login password required!")
@@ -296,6 +306,7 @@ class PaymentFields(IStepActor):
 
         input_texts = driver.find_elements_by_css_selector("input[type='text']")
         input_texts += driver.find_elements_by_css_selector("input[type='email']")
+        input_texts += driver.find_elements_by_css_selector("input[type='password']")
 
         if is_userInfo:
             json_Info = context.user_info.get_json_userinfo()
@@ -327,6 +338,8 @@ class PaymentFields(IStepActor):
         select_contains = ["country", "state", "zone"]
         not_extra_contains = ["email"]
         extra_contains = [
+            ["fname", "firstname"],
+            ["lname", "lastname"],
             ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
             ["post", "zip"]
         ]
@@ -342,7 +355,7 @@ class PaymentFields(IStepActor):
 
     def fill_payment_info(self, driver, context):
         select_contains = ["card", "exp", "exp1"]
-        not_extra_contains = ["first", "last", "phone"]
+        not_extra_contains = ["first", "last", "phone", "company", "fname", "lname"]
         extra_contains = [
             ["owner", "name"],
             ["cc.*n", "number"],
@@ -454,6 +467,7 @@ class PaymentFields(IStepActor):
             #create an account as guest....
             if not click_first(driver, auth_pass):
                 return state
+            time.sleep(2)
             account_btn = find_buttons_or_links(driver, ["button*.*account", "account*.*button"])
             if account_btn:
                 if click_first(driver, account_btn):
