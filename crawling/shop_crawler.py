@@ -1,17 +1,11 @@
 import logging
 import traceback
 from abc import ABCMeta, abstractmethod
-from selenium import webdriver
-import sys
-import time
-from selenium.webdriver.common.keys import Keys
-from selenium_helper import *
 import requests
 import selenium
-import nlp
 from common_heuristics import *
-
-from selenium.webdriver.support.expected_conditions import staleness_of
+from selenium_helper import *
+from status import *
 
 
 class States:
@@ -25,67 +19,6 @@ class States:
     purchased = "purchased"
 
     states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
-
-
-class ICrawlingStatus:
-    """
-        Status of Shop crawling
-    """
-    def __init__(self,
-                 url,
-                 status,
-                 message = None,
-                 limit = 60,
-                 redirected_to_domain = None,
-                 state = None,
-                 exception = None,
-                 chain_urls = None
-                ):
-
-        self.url = url
-        self.status = status
-        self.message = message
-        self.limit = limit
-        self.redirected_to_domain = redirected_to_domain
-        self.state = state
-        self.exception = exception,
-        self.chain_urls = chain_urls
-
-    def __str__(self):
-        if self.message:
-            return 'Status: "{}" after processing url "{}"\n {}'.format(self.status, self.url, self.message)
-        else:
-            return 'Status: "{}" after processing url "{}"'.format(self.status, self.url)
-
-
-class NotAvailable(ICrawlingStatus):
-    """
-        Status for shop that are not available
-    """
-    def __init__(self, url, message = None):
-        super().__init__(url, 'Not Available', message = message)
-
-class RequestError(ICrawlingStatus):
-    """
-        Get response with ant
-    """
-    def __init__(self, url, code, message = None):
-        self.code = code
-        super().__init__(url, 'Error {}'.format(self.code), message = message)
-
-class Timeout(ICrawlingStatus):
-    def __init__(self, url, limit, message = None):
-        super().__init__(url, "Time Out", message = message)
-        self.limit = limit
-
-class ProcessingStatus(ICrawlingStatus):
-    def __init__(self, url, chain_urls, state, exception = None, message = None):
-        super().__init__(url, 'Processing Finished at State',
-                         state = state, 
-                         exception = exception, 
-                         chain_urls = chain_urls,
-                         message = message
-                        )
 
 
 class UserInfo:
@@ -152,11 +85,44 @@ class PaymentInfo:
         }
 
 
-class StepContext:
-    def __init__(self, domain, user_info, payment_info):
+class TraceContext:
+    def __init__(self, domain, user_info, payment_info, crawler):
         self.user_info = user_info
         self.payment_info = payment_info
         self.domain = domain
+        self.crawler = crawler
+        self.trace_logger = crawler._trace_logger
+        self.trace = None
+        
+    def on_started(self):
+        self.state = States.new
+        self.url = self.crawler._driver.current_url
+    
+        if self.trace_logger:
+            self.trace = self.trace_logger.start_new(self.domain)
+            self.log_step(None, 'started')
+    
+    def on_handler_finished(self, state, handler):
+        if self.state != state or self.url != self.crawler._driver.current_url:
+            self.state = state
+            self.url = self.crawler._driver.current_url
+            self.log_step(handler)
+    
+    def on_finished(self, status):
+        if not self.trace_logger:
+            return
+        
+        self.log_step(None, 'finished')
+        
+        self.trace_logger.save(self.trace, status)
+        self.trace = None
+    
+    def log_step(self, handler, additional = None):
+        if not self.trace:
+            return
+        
+        driver = self.crawler._driver
+        self.trace.save_snapshot(driver, self.state, handler, additional)
 
 
 class IStepActor:
@@ -187,9 +153,13 @@ class IStepActor:
 
 
 class ShopCrawler:
-    def __init__(self, user_info, payment_info,
+    def __init__(self, 
+                 user_info, 
+                 payment_info,
                  chrome_path='/usr/local/chromedriver',
-                 headless=True
+                 headless=False,
+                 # Must be an instance of ITraceSaver
+                 trace_logger = None
                  ):
         self._handlers = []
         self._user_info = user_info
@@ -198,6 +168,7 @@ class ShopCrawler:
         self._logger = logging.getLogger('shop_crawler')
         self._headless = headless
         self._driver = None
+        self._trace_logger = trace_logger
         
         
     def __enter__(self):
@@ -226,12 +197,12 @@ class ShopCrawler:
             response = requests.get(url, verify=False, timeout=timeout)
             code = response.status_code
             if code >= 400:
-                return RequestError(url, code)
+                return RequestError(code)
             
             return None
         
         except selenium.common.exceptions.TimeoutException:
-            return Timeout(url, timeout)
+            return Timeout(timeout)
             
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
@@ -250,6 +221,7 @@ class ShopCrawler:
         self._driver = driver
 
         return driver
+    
 
     def process_state(self, driver, state, context):
         # Close popups if appeared
@@ -267,13 +239,16 @@ class ShopCrawler:
             new_state = handler.act(driver, state, context)
             self.close_popus_if_appeared()
             self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
-
+            
             assert new_state is not None, "new_state is None"
+            
+            context.on_handler_finished(new_state, handler)            
 
             if new_state != state:
                 return new_state
 
         return state
+    
 
     def crawl(self, domain, wait_response_seconds = 60, attempts = 3):
         """
@@ -283,7 +258,7 @@ class ShopCrawler:
 
         result = None
         best_state_idx = -1
-        for attempt in range(attempts):
+        for _ in range(attempts):
             attempt_result = self.do_crawl(domain, wait_response_seconds)
 
             if isinstance(attempt_result, ProcessingStatus):
@@ -300,34 +275,32 @@ class ShopCrawler:
                 result = attempt_result
 
         return result
-
-
+    
+    
     def do_crawl(self, domain, wait_response_seconds = 60):
 
         url = ShopCrawler.normalize_url(domain)
-        chain_urls = [url]
-        context = StepContext(domain, self._user_info, self._payment_info)
 
         driver = self.get_driver()
         state = States.new
 
+        context = TraceContext(domain, self._user_info, self._payment_info, self)
+            
         try:
             status = ShopCrawler.get(driver, url, wait_response_seconds)
-
+            
+            context.on_started()
+            
             if status:
                 return status
 
             if is_domain_for_sale(driver, domain):
-                return NotAvailable(url, message = 'Domain {} for sale'.format(domain))
+                return NotAvailable(message = 'Domain {} for sale'.format(domain))
 
             new_state = state
-
             while state != States.purchased:
                 frames = get_frames(driver)
                 
-                if driver.current_url != chain_urls[-1]:
-                    chain_urls.append(driver.current_url)
-
                 if len(frames) > 1:
                     self._logger.info('found {} frames'.format(len(frames) - 1))
 
@@ -335,7 +308,7 @@ class ShopCrawler:
                 
                 frames_number = len(frames)
                 for i in range(frames_number):
-                    if len(frames) > 1 and staleness_of(frames[-1]):
+                    if len(frames) > 1 and is_stale(frames[-1]):
                         frames = get_frames(driver)
                     
                     if len(frames) <= i:
@@ -349,12 +322,19 @@ class ShopCrawler:
                             break
 
                 if state == new_state:
-                    return ProcessingStatus(domain, chain_urls, state)
-
+                    break
+                    
                 state = new_state
+                
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
             exception = traceback.format_exc()
-            return ProcessingStatus(domain, chain_urls, state, exception=exception)
+            status = ProcessingStatus(state, exception=exception)
+        
+        finally:
+            if not status:
+                status = ProcessingStatus(state)
+            
+            context.on_finished(status)
 
-        return ProcessingStatus(domain, chain_urls, state)
+        return status
