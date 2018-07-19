@@ -98,7 +98,8 @@ class UserInfo:
                  state,
                  country,
                  phone,
-                 email
+                 email,
+                 password
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -110,6 +111,7 @@ class UserInfo:
         self.country = country
         self.phone = phone
         self.email = email
+        self.password = password
 
     def get_json_userinfo(self):
         return {
@@ -123,6 +125,7 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
+            "password": self.password
         }
 
 

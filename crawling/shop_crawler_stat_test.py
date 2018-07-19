@@ -24,21 +24,14 @@ sample_urls = random.sample(all_urls, 20)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'theglamourshop.com',
     'firstfitness.com',
-    'ambarygardens.com',
-    'anabolicwarfare.com'
-    'vapininthecape.com',
-    'jonessurgical.com',
-    'vaporsupply.com',
-    'srandd.com',
-    'docssmokeshop.com',
-    'sandlakedermatology.com',
-    'docssmokeshop.com',
     'dixieems.com',
-    'srandd.com',
+    'theglamourshop.com',
+    'sandlakedermatology.com',
+    'getwaave.com',
+    'jonessurgical.com',
+    'anabolicwarfare.com'
 ]
-
 
 user_info = UserInfo(
     first_name = 'John',
@@ -50,7 +43,8 @@ user_info = UserInfo(
     zip = '33125',
     state = 'Florida',
     phone = '1231232',
-    email = 'john@service.com'
+    email = 'john@service.com',
+    password = '!Jacky123'
 )
 
 billing_info = PaymentInfo(
@@ -91,7 +85,7 @@ results = []
 url_analyzer = CheckoutUrlsInfo()
 
 with get_crawler(headless=False) as crawler:
-    for url in sample_urls:
+    for url in good_urls:
         logger.info('\n\nstarted url: {}'.format(url))
         crawler.init_analyzer(url_analyzer)
         status = crawler.crawl(url, 60, attempts=1)
