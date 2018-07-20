@@ -10,8 +10,6 @@ import json
 class TraceEncoder(json.JSONEncoder):
     
     def default(self, o):
-        obj_dict = {}
-        
         if isinstance(o, tuple) and hasattr(o, '_asdict'):
             obj_dict = o._asdict()
         elif hasattr(o, '__dict__'):
@@ -75,6 +73,11 @@ class FileTraceLogger(ITraceLogger):
         # create image folder if not exists
         if not os.path.exists(img_folder):
             os.makedirs(img_folder)
+
+        # Delete all .png files in directory
+        old_files = [ f for f in os.listdir(img_folder) if f.endswith(".png") ]
+        for file in old_files:
+            os.remove(os.path.join(img_folder, fil))
 
 
     @abstractmethod
