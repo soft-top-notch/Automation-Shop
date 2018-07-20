@@ -201,7 +201,7 @@ class PaymentFields(IStepActor):
 
     def filter_page(self, driver, state, content):
         password_fields = self.find_pwd_in_checkout(driver)
-        logger = logging.getLogger("shop_crawler")
+        logger = logging.getLogger("shop_tracer")
         if password_fields:
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
@@ -276,7 +276,7 @@ class PaymentFields(IStepActor):
                                  extra_contains,
                                  is_userInfo=True,
                                  not_extra_contains=None):
-        logger = logging.getLogger('shop_crawler')
+        logger = logging.getLogger('shop_tracer')
         success_flag = False
 
         if not self.process_select_option(driver, select_contains, context):
@@ -356,7 +356,7 @@ class PaymentFields(IStepActor):
         return False
 
     def click_to_order(self, driver, context):
-        logger = logging.getLogger('shop_crawler')
+        logger = logging.getLogger('shop_tracer')
         dest = []
         is_paymentinfo = True
         payment_url = None
@@ -510,7 +510,7 @@ class SearchForProductPage(IStepActor):
                             return links
 
                     except:
-                        logger = logging.getLogger('shop_crawler')
+                        logger = logging.getLogger('shop_tracer')
                         logger.exception('during search in search engine got an exception')
 
         finally:
@@ -528,12 +528,12 @@ class SearchForProductPage(IStepActor):
         return state
 
 
-def add_crawler_extensions(crawler):
-    crawler.add_handler(AddToCart(), 4)
-    crawler.add_handler(SearchForProductPage(), 1)
-    crawler.add_handler(ToProductPageLink(), 3)
-    crawler.add_handler(ToShopLink(), 2)
+def add_tracer_extensions(tracer):
+    tracer.add_handler(AddToCart(), 4)
+    tracer.add_handler(SearchForProductPage(), 1)
+    tracer.add_handler(ToProductPageLink(), 3)
+    tracer.add_handler(ToShopLink(), 2)
 
-    crawler.add_handler(ToCheckout(), 3)
-    crawler.add_handler(ToCartLink(), 2)
-    crawler.add_handler(PaymentFields(), 2)
+    tracer.add_handler(ToCheckout(), 3)
+    tracer.add_handler(ToCartLink(), 2)
+    tracer.add_handler(PaymentFields(), 2)

@@ -1,8 +1,11 @@
-### Crawling
+### Tracing
 
-#### Fake Data Service
+Code that buys something from shops and saves traces.
+Navigation and checkout page filling is a heuristic based.
 
-First we need to start Fake data service.
+#### Mock Data Service
+
+First we need to start data service with mock user data
 
 1. Clone retrace_automation repo
 ```shell
@@ -22,15 +25,23 @@ pip2 install falcon ujson faker barnum gunicorn
 
 #### Run script that traces random urls
 
+Then we can run shops tracing.
+
 1. Clone trace_automation repo
 ```shell
 git clone https://github.com/g2webservices/trace_automation
 ```
 
-To measure quality run code shop_crawler_stat_test.py
+We can start code that runs tracing on random sample shops code shop_crawler_stat_test.py
 
 2. Use xvfb to run in headless mode:
 ```shell
 sudo apt-get install xvfb
-xvfb-run python trace_automation/crawler/shop_crawler_stat_test.py
+cd trace_automation/tracing
+xvfb-run python shop_tracer_stat_test.py
+```
+
+3. Or we can run jupyter-notebook 
+```shell
+jupyter-notebook trace_automation/tracing/shop_tracer.ipynb
 ```

@@ -23,19 +23,19 @@ class States:
 
 
 class TraceContext:
-    def __init__(self, domain, user_info, payment_info, crawler):
+    def __init__(self, domain, user_info, payment_info, tracer):
         self.user_info = user_info
         self.payment_info = payment_info
         self.domain = domain
-        self.crawler = crawler
-        self.trace_logger = crawler._trace_logger
+        self.tracer = tracer
+        self.trace_logger = tracer._trace_logger
         self.trace = None
         self.state = None
         self.url = None
 
     @property
     def driver(self):
-        return self.crawler._driver
+        return self.tracer._driver
 
     def on_started(self):
         self.state = States.new
@@ -115,7 +115,7 @@ class ShopTracer:
         self._handlers = []
         self._get_user_data = get_user_data
         self._chrome_path = chrome_path
-        self._logger = logging.getLogger('shop_crawler')
+        self._logger = logging.getLogger('shop_tracer')
         self._headless = headless
         self._driver = None
         self._trace_logger = trace_logger

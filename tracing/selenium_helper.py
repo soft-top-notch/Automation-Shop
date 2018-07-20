@@ -35,7 +35,7 @@ def can_click(element):
     try:
         return element.is_enabled() and element.is_displayed()
     except WebDriverException:
-        logger = logging.getLogger('shop_crawler')
+        logger = logging.getLogger('shop_tracer')
         exception = traceback.format_exc()
         logger.debug('during check if can click exception was thrown {}'.format(exception))
         
@@ -49,7 +49,7 @@ def find_alert(driver):
 def close_alert_if_appeared(driver):
     alert = find_alert(driver)
     if alert:
-        logger = logging.getLogger('shop_crawler')
+        logger = logging.getLogger('shop_tracer')
         logger.info('found alert with text {}'.format(alert.text))
         alert.dismiss()
 
