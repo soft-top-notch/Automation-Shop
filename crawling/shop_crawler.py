@@ -25,6 +25,7 @@ class UserInfo:
     def __init__(self,
                  first_name,
                  last_name,
+                 company_name,
                  home,
                  street,
                  zip,
@@ -36,6 +37,7 @@ class UserInfo:
                  password
                  ):
         self.first_name = first_name
+        self.company_name = company_name
         self.last_name = last_name
         self.home = home
         self.street = street
@@ -59,7 +61,8 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
-            "password": self.password
+            "password": self.password,
+            "company": self.company_name
         }
 
 

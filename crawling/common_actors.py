@@ -271,6 +271,7 @@ class PaymentFields(IStepActor):
                                  not_extra_contains=None):
         logger = logging.getLogger('shop_crawler')
         success_flag = False
+        inputed_fields = []
 
         if not self.process_select_option(driver, select_contains, context):
             logger.debug("Not found select options!")
@@ -295,10 +296,11 @@ class PaymentFields(IStepActor):
                     label_text = conItem[1]
                     break
             for key in json_Info.keys():
-                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]):
+                if nlp.check_text(label_text, [nlp.remove_elements(key, [" "])]) and not key in inputed_fields:
                     try:
                         elem.click()
                         elem.send_keys(json_Info[key])
+                        inputed_fields.append(key)
                         success_flag = True
                     except:
                         pass
@@ -311,6 +313,7 @@ class PaymentFields(IStepActor):
         extra_contains = [
             ["fname", "firstname"],
             ["lname", "lastname"],
+            ["comp", "company"],
             ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
             ["post", "zip"]
         ]
@@ -356,18 +359,23 @@ class PaymentFields(IStepActor):
         dest = []
         is_paymentinfo = True
         payment_url = None
+        try_cnt = 0
 
         while True:
+            import pdb;pdb.set_trace()
+            if try_cnt >= 4:
+                logger.debug("Error found in filling all fields")
+                return False
             order = find_buttons(
                 driver,
                 ["order", "checkout"],
-                ["add", "modify", "coupon", "express"]
+                ["add", "modify", "coupon", "express", "continu", "border"]
             )
 
             order = [elem for elem in order if elem.get_attribute("href") != driver.current_url]
             agree_btns = find_radio_or_checkbox_buttons(
                 driver,
-                ["agree", "terms", "paypal"],
+                ["agree", "terms", "paypal", "same", "copy", "remember", "keep"],
                 ["express"]
             )
 
@@ -376,13 +384,12 @@ class PaymentFields(IStepActor):
                     if not elem.is_selected():
                         try:
                             elem.click()
-                            break
                         except ElementNotVisibleException:
                             pass
             if order:
                 break
 
-            continue_btns = find_buttons_or_links(driver, ["continue"], ["login"])
+            continue_btns = find_buttons_or_links(driver, ["continu"], ["login"])
             flag = False
 
             if continue_btns:
@@ -398,6 +405,7 @@ class PaymentFields(IStepActor):
                     return False
                 forward_btns[len(forward_btns) - 1].click()
             time.sleep(2)
+            try_cnt += 1
 
         if not self.fill_payment_info(driver, context):
             is_paymentinfo = False
@@ -407,6 +415,7 @@ class PaymentFields(IStepActor):
 
         '''paying or clicking place order for paying...'''
 
+        import pdb;pdb.set_trace()
         order_attribute = get_element_attribute(order[0])
         order[0].click()
         time.sleep(2)

@@ -24,9 +24,9 @@ sample_urls = random.sample(all_urls, 20)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'firstfitness.com',
     'dixieems.com',
     'theglamourshop.com',
+    'firstfitness.com',
     'sandlakedermatology.com',
     'getwaave.com',
     'jonessurgical.com',
@@ -37,6 +37,7 @@ user_info = UserInfo(
     first_name = 'John',
     last_name = 'Smith',
     country = 'United States',
+    company_name = 'Jacky',
     home = 34,
     street = 'Ocean drive',
     city = 'Miami',
@@ -44,7 +45,7 @@ user_info = UserInfo(
     state = 'Florida',
     phone = '1231232',
     email = 'john@service.com',
-    password = '!Jacky123'
+    password = 'Jacky123'
 )
 
 billing_info = PaymentInfo(
