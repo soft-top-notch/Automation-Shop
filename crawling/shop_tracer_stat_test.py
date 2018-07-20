@@ -67,7 +67,7 @@ selenium_path = '/usr/bin/chromedriver'
 @contextmanager
 def get_crawler(headless=True):
     global user_info, billing_info, selinium_path
-    crawler = ShopCrawler(user_info, billing_info, selenium_path, headless=headless)
+    crawler = ShopTracer(user_info, billing_info, selenium_path, headless=headless)
     common_actors.add_crawler_extensions(crawler)
 
     yield crawler
@@ -87,10 +87,10 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 results = []
-with get_crawler(headless=False) as crawler:
+with get_tracer(headless=False) as crawler:
     for url in sample_urls:
         logger.info('\n\nstarted url: {}'.format(url))
-        status = crawler.crawl(url, 60, attempts=1)
+        status = tracer.trace(url, 60, attempts=1)
         results.append(status)
         logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
 

@@ -77,7 +77,7 @@ class FileTraceLogger(ITraceLogger):
         # Delete all .png files in directory
         old_files = [ f for f in os.listdir(img_folder) if f.endswith(".png") ]
         for file in old_files:
-            os.remove(os.path.join(img_folder, fil))
+            os.remove(os.path.join(img_folder, file))
 
 
     @abstractmethod

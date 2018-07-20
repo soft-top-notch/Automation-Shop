@@ -1,4 +1,4 @@
-from shop_crawler import *
+from shop_tracer import *
 from selenium_helper import *
 from common_heuristics import *
 
@@ -57,7 +57,7 @@ class ToProductPageLink(IStepActor):
 
             link = links[i]
 
-            url = ShopCrawler.normalize_url(link)
+            url = ShopTracer.normalize_url(link)
             driver.get(url)
             time.sleep(5)
             
@@ -413,7 +413,7 @@ class PaymentFields(IStepActor):
         order[0].click()
         time.sleep(2)
 
-        if order_attribute[0] != "value":
+        if order_attribute and order_attribute[0] != "value":
             if wait_until_attribute_disappear(driver, order_attribute[0], order_attribute[1]):
                 logger.debug("Order element is disappeared")
         else:

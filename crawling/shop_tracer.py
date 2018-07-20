@@ -6,6 +6,7 @@ import selenium
 from common_heuristics import *
 from selenium_helper import *
 from status import *
+import user_data
 
 
 class States:
@@ -21,70 +22,6 @@ class States:
     states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
 
 
-class UserInfo:
-    def __init__(self,
-                 first_name,
-                 last_name,
-                 home,
-                 street,
-                 zip,
-                 city,
-                 state,
-                 country,
-                 phone,
-                 email
-                 ):
-        self.first_name = first_name
-        self.last_name = last_name
-        self.home = home
-        self.street = street
-        self.zip = zip
-        self.state = state
-        self.city = city
-        self.country = country
-        self.phone = phone
-        self.email = email
-
-    def get_json_userinfo(self):
-        return {
-            "first name": self.first_name,
-            "last name": self.last_name,
-            "country": self.country,
-            "state": self.state,
-            "home": self.home,
-            "street": self.street,
-            "zip": self.zip,
-            "city": self.city,
-            "phone": self.phone,
-            "email": self.email,
-        }
-
-
-class PaymentInfo:
-    def __init__(self,
-                 card_number,
-                 card_name,
-                 card_type,
-                 expire_date_year,
-                 expire_date_month,
-                 cvc
-                 ):
-        self.card_number = card_number
-        self.card_name = card_name
-        self.card_type = card_type
-        self.expire_date_year = expire_date_year
-        self.expire_date_month = expire_date_month
-        self.cvc = cvc
-
-    def get_json_paymentinfo(self):
-        return {
-            "number": self.card_number,
-            "name": self.card_name,
-            "type": self.card_type,
-            "cvc": self.cvc,
-        }
-
-
 class TraceContext:
     def __init__(self, domain, user_info, payment_info, crawler):
         self.user_info = user_info
@@ -93,19 +30,25 @@ class TraceContext:
         self.crawler = crawler
         self.trace_logger = crawler._trace_logger
         self.trace = None
-        
+        self.state = None
+        self.url = None
+
+    @property
+    def driver(self):
+        return self.crawler._driver
+
     def on_started(self):
         self.state = States.new
-        self.url = self.crawler._driver.current_url
+        self.url = self.driver.current_url
     
         if self.trace_logger:
             self.trace = self.trace_logger.start_new(self.domain)
             self.log_step(None, 'started')
     
     def on_handler_finished(self, state, handler):
-        if self.state != state or self.url != self.crawler._driver.current_url:
+        if self.state != state or self.url != self.driver.current_url:
             self.state = state
-            self.url = self.crawler._driver.current_url
+            self.url = self.driver.current_url
             self.log_step(handler)
     
     def on_finished(self, status):
@@ -121,11 +64,13 @@ class TraceContext:
         if not self.trace:
             return
         
-        driver = self.crawler._driver
-        self.trace.save_snapshot(driver, self.state, handler, additional)
+        self.trace.save_snapshot(self.driver, self.state, handler, additional)
 
 
 class IStepActor:
+
+    def __init__(self):
+        pass
 
     @abstractmethod
     def filter_page(self, driver, state, context):
@@ -152,32 +97,35 @@ class IStepActor:
         return step
 
 
-class ShopCrawler:
-    def __init__(self, 
-                 user_info, 
-                 payment_info,
+class ShopTracer:
+    def __init__(self,
+                 get_user_data,
                  chrome_path='/usr/local/chromedriver',
                  headless=False,
                  # Must be an instance of ITraceSaver
                  trace_logger = None
                  ):
+        """
+        :param get_user_data: Function that should return tuple (user_data.UserInfo, user_data.PaymentInfo)
+            to fill checkout page
+        :param chrome_path:   Path to chrome driver
+        :param headless:      Wheather to start driver in headless mode
+        :param trace_logger:  ITraceLogger instance that could store snapshots and source code during tracing
+        """
         self._handlers = []
-        self._user_info = user_info
-        self._payment_info = payment_info
+        self._get_user_data = get_user_data
         self._chrome_path = chrome_path
         self._logger = logging.getLogger('shop_crawler')
         self._headless = headless
         self._driver = None
         self._trace_logger = trace_logger
-        
-        
+
     def __enter__(self):
         pass
     
     def __exit__(self, type, value, traceback):
         if self._driver:
             self._driver.quit()
-
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -221,7 +169,6 @@ class ShopCrawler:
         self._driver = driver
 
         return driver
-    
 
     def process_state(self, driver, state, context):
         # Close popups if appeared
@@ -248,18 +195,21 @@ class ShopCrawler:
                 return new_state
 
         return state
-    
 
-    def crawl(self, domain, wait_response_seconds = 60, attempts = 3):
+    def trace(self, domain, wait_response_seconds = 60, attempts = 3):
         """
-            Crawls shop in domain
-            Returns ICrawlingStatus
+        Traces shop
+
+        :param domain:                 Shop domain to trace
+        :param wait_response_seconds:  Seconds to wait response from shop
+        :param attempts:               Number of attempts to navigate to checkout page
+        :return:                       ICrawlingStatus
         """
 
         result = None
         best_state_idx = -1
         for _ in range(attempts):
-            attempt_result = self.do_crawl(domain, wait_response_seconds)
+            attempt_result = self.do_trace(domain, wait_response_seconds)
 
             if isinstance(attempt_result, ProcessingStatus):
                 idx = States.states.index(attempt_result.state)
@@ -275,19 +225,20 @@ class ShopCrawler:
                 result = attempt_result
 
         return result
-    
-    
-    def do_crawl(self, domain, wait_response_seconds = 60):
 
-        url = ShopCrawler.normalize_url(domain)
+    def do_trace(self, domain, wait_response_seconds = 60):
+
+        url = ShopTracer.normalize_url(domain)
 
         driver = self.get_driver()
         state = States.new
 
-        context = TraceContext(domain, self._user_info, self._payment_info, self)
+        user_info, payment_info = self._get_user_data()
+
+        context = TraceContext(domain, user_info, payment_info, self)
             
         try:
-            status = ShopCrawler.get(driver, url, wait_response_seconds)
+            status = ShopTracer.get(driver, url, wait_response_seconds)
             
             context.on_started()
             
@@ -295,7 +246,7 @@ class ShopCrawler:
                 return status
 
             if is_domain_for_sale(driver, domain):
-                return NotAvailable(message = 'Domain {} for sale'.format(domain))
+                return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
             while state != States.purchased:
@@ -329,7 +280,7 @@ class ShopCrawler:
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
             exception = traceback.format_exc()
-            status = ProcessingStatus(state, exception=exception)
+            status = ProcessingStatus(state, exception)
         
         finally:
             if not status:
