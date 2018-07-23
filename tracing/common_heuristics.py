@@ -36,7 +36,7 @@ def is_link(driver, elem):
         href = normalize_url(href)
         return href and not href.startswith('javascript:') and href != driver.current_url
     except:
-        logger = logging.getLogger('shop_crawler')
+        logger = logging.getLogger('shop_tracer')
         logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
         return False
 
@@ -104,11 +104,11 @@ def click_first(driver, elements, on_error=None, randomize = False):
             return True
         
         except WebDriverException:
-            logger = logging.getLogger('shop_crawler')
+            logger = logging.getLogger('shop_tracer')
             logger.debug('Unexpected exception during clicking element {}'.format(traceback.format_exc()))
             return False
 
-    logger = logging.getLogger('shop_crawler')
+    logger = logging.getLogger('shop_tracer')
     
     if randomize:
         random.shuffle(elements)

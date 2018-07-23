@@ -2,9 +2,10 @@ import random
 import csv
 import logging
 
-from shop_crawler import *
+from shop_tracer import *
 from selenium_helper import *
 import common_actors
+import user_data
 
 from contextlib import contextmanager
 
@@ -39,45 +40,18 @@ good_urls = [
 ]
 
 
-user_info = UserInfo(
-    first_name = 'John',
-    last_name = 'Smith',
-    country = 'United States',
-    home = 34,
-    street = 'Ocean drive',
-    city = 'Miami',
-    zip = '33125',
-    state = 'Florida',
-    phone = '1231232',
-    email = 'john@service.com'
-)
-
-billing_info = PaymentInfo(
-    card_number = '1413232312312321',
-    card_name = 'Visa Card',
-    card_type = 'Visa',
-    expire_date_year = 2020,
-    expire_date_month = 12,
-    cvc = '123'
-)
-
-
 selenium_path = '/usr/bin/chromedriver'
 
 @contextmanager
-def get_crawler(headless=True):
-    global user_info, billing_info, selinium_path
-    crawler = ShopCrawler(user_info, billing_info, selenium_path, headless=headless)
-    common_actors.add_crawler_extensions(crawler)
+def get_tracer(headless=False):
+    global selinium_path
+    tracer = ShopTracer(user_data.get_user_data, selenium_path, headless=headless)
+    common_actors.add_tracer_extensions(tracer)
 
-    yield crawler
-
-def get_driver(headless=True):
-    global selenium_path
-    return create_chrome_driver(selenium_path, headless=headless)
+    yield tracer
 
 
-logger = logging.getLogger('shop_crawler')
+logger = logging.getLogger('shop_tracer')
 logger.setLevel(logging.DEBUG)
 
 handler = logging.StreamHandler()
@@ -87,10 +61,10 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 results = []
-with get_crawler(headless=False) as crawler:
+with get_tracer(headless=False) as tracer:
     for url in sample_urls:
         logger.info('\n\nstarted url: {}'.format(url))
-        status = crawler.crawl(url, 60, attempts=1)
+        status = tracer.trace(url, 60, attempts=1)
         results.append(status)
         logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
 
