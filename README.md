@@ -1,7 +1,7 @@
 ### Tracing
 
 Code that buys something from shops and saves traces.
-Navigation and checkout page filling is a heuristic based.
+Navigation and checkout page filling is heuristic based.
 
 #### Mock Data Service
 
@@ -41,7 +41,7 @@ cd trace_automation/tracing
 xvfb-run python shop_tracer_stat_test.py
 ```
 
-3. Or we can run jupyter-notebook 
+3. Or it's possible to run jupyter-notebook 
 ```shell
 jupyter-notebook trace_automation/tracing/shop_tracer.ipynb
 ```
