@@ -22,6 +22,11 @@ def find_radio_or_checkbox_buttons(driver,
     
     return result
 
+def find_elements_with_attribute(driver,
+                                attr_tagname,
+                                attr_type,
+                                attr_content):
+    return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
 def normalize_url(url):
     if not url:

@@ -94,12 +94,16 @@ def close_tab(driver):
 
 
 def get_element_attribute(element):
+    if 'hidden' in element.get_attribute('class'):
+        return None
     if element.get_attribute('id'):
         return ['id', element.get_attribute('id')]
     elif element.get_attribute('name'):
         return ['name', element.get_attribute('name')]
     elif element.get_attribute('value'):
         return ['value', element.get_attribute('value')]
+    elif element.get_attribute('class'):
+        return ['class', element.get_attribute('class')]
 
     return None
 
@@ -113,6 +117,10 @@ def wait_until_attribute_disappear(driver, attr_type, attr_name):
         elif attr_type == "name":
                 element = WebDriverWait(driver, 3).until(
                     EC.invisibility_of_element_located((By.NAME, attr_name))
+                )
+        elif attr_type == "class":
+                element = WebDriverWait(driver, 3).until(
+                    EC.invisibility_of_element_located((By.CLASS, attr_name))
                 )
     except TimeoutException:
         print('The element does not disappear')

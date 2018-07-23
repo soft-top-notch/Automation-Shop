@@ -87,6 +87,7 @@ class PaymentInfo:
             "number": self.card_number,
             "name": self.card_name,
             "type": self.card_type,
+            "expdate": str(self.expire_date_month) + str(self.expire_date_year)[:-2],
             "cvc": self.cvc,
         }
 
@@ -241,7 +242,7 @@ class ShopCrawler:
 
         if state == States.checkout_page:
             if not handlers:
-                self._analyzer.save_urls(context.domain)
+                self._analyzer.save_urls(context.domain, False)
             else:
                 self._analyzer.save_urls(context.domain, True)
 

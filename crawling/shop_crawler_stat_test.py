@@ -24,15 +24,14 @@ sample_urls = random.sample(all_urls, 20)
 
 # Some good urls to analyze by hands
 good_urls = [
+    'anabolicwarfare.com',
     'dixieems.com',
-    'theglamourshop.com',
     'firstfitness.com',
+    'theglamourshop.com',
     'sandlakedermatology.com',
     'getwaave.com',
-    'jonessurgical.com',
-    'anabolicwarfare.com'
+    'jonessurgical.com'
 ]
-
 user_info = UserInfo(
     first_name = 'John',
     last_name = 'Smith',
