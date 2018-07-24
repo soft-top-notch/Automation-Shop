@@ -112,10 +112,14 @@ def create_chrome_driver(chrome_path, headless=True):
     options.add_argument("--disable-notifications")
     options.add_argument("--start-maximized")
     options.add_argument("--disable-web-security")
+    options.add_argument("--ignore-certificate-errors");
+    
     options.add_argument("--no-proxy-server")
     options.add_argument("--enable-automation")
     options.add_argument("--disable-save-password-bubble")
-
+    options.add_argument("--crash-on-hang-threads")
+    
+    
     return webdriver.Chrome(chrome_path, chrome_options=options)
 
 def back(driver):

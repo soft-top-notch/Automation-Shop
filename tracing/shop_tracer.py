@@ -32,12 +32,15 @@ class TraceContext:
         self.trace = None
         self.state = None
         self.url = None
+        self.is_started = False
 
     @property
     def driver(self):
         return self.tracer._driver
 
     def on_started(self):
+        assert not self.is_started, "Can't call on_started when is_started = True"
+        self.is_started = True
         self.state = States.new
         self.url = self.driver.current_url
     
@@ -49,9 +52,12 @@ class TraceContext:
         if self.state != state or self.url != self.driver.current_url:
             self.state = state
             self.url = self.driver.current_url
-            self.log_step(handler)
+            self.log_step(str(handler))
     
     def on_finished(self, status):
+        assert self.is_started, "Can't call on_finished when is_started = False"
+        self.is_started = False
+        
         if not self.trace_logger:
             return
         
@@ -155,10 +161,6 @@ class ShopTracer:
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
   
-    def close_popus_if_appeared(self):
-        close_alert_if_appeared(self._driver)
-        try_handle_popups(self._driver)                
-        
     def get_driver(self, timeout=60):
         if self._driver:
             self._driver.quit()
@@ -172,7 +174,7 @@ class ShopTracer:
 
     def process_state(self, driver, state, context):
         # Close popups if appeared
-        self.close_popus_if_appeared()
+        close_alert_if_appeared(self._driver)
             
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
@@ -182,17 +184,33 @@ class ShopTracer:
         self._logger.info('processing state: {}'.format(state))
 
         for priority, handler in handlers:
-            self._logger.info('handler {}'.format(handler))
-            new_state = handler.act(driver, state, context)
-            self.close_popus_if_appeared()
-            self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
-            
-            assert new_state is not None, "new_state is None"
-            
-            context.on_handler_finished(new_state, handler)            
+            frames = get_frames(driver)
+                
+            if len(frames) > 1 and state == States.new:
+                self._logger.info('found {} frames'.format(len(frames) - 1))
 
-            if new_state != state:
-                return new_state
+            frames_number = len(frames)
+            for i in range(frames_number):
+                if len(frames) > 1 and is_stale(frames[-1]):
+                    frames = get_frames(driver)
+
+                if len(frames) <= i:
+                    break
+
+                frame = frames[i]
+
+                with Frame(driver, frame):
+                    self._logger.info('handler {}'.format(handler))
+                    new_state = handler.act(driver, state, context)
+                    close_alert_if_appeared(self._driver)
+                    self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
+
+                    assert new_state is not None, "new_state is None"
+
+                    context.on_handler_finished(new_state, handler)            
+
+                    if new_state != state:
+                        return new_state
 
         return state
 
@@ -240,37 +258,18 @@ class ShopTracer:
         try:
             status = ShopTracer.get(driver, url, wait_response_seconds)
             
-            context.on_started()
-            
             if status:
                 return status
 
+            context.on_started()   
+            assert context.is_started
+            
             if is_domain_for_sale(driver, domain):
                 return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
             while state != States.purchased:
-                frames = get_frames(driver)
-                
-                if len(frames) > 1:
-                    self._logger.info('found {} frames'.format(len(frames) - 1))
-
-                last_url = driver.current_url
-                
-                frames_number = len(frames)
-                for i in range(frames_number):
-                    if len(frames) > 1 and is_stale(frames[-1]):
-                        frames = get_frames(driver)
-                    
-                    if len(frames) <= i:
-                        break
-                        
-                    frame = frames[i]
-                    
-                    with Frame(driver, frame):
-                        new_state = self.process_state(driver, state, context)
-                        if new_state != state or last_url != driver.current_url:
-                            break
+                new_state = self.process_state(driver, state, context)
 
                 if state == new_state:
                     break
@@ -286,6 +285,7 @@ class ShopTracer:
             if not status:
                 status = ProcessingStatus(state)
             
-            context.on_finished(status)
+            if context.is_started:
+                context.on_finished(status)
 
         return status

@@ -59,7 +59,7 @@ class ToProductPageLink(IStepActor):
 
             url = ShopTracer.normalize_url(link)
             driver.get(url)
-            time.sleep(5)
+            time.sleep(1)
             
             # Check that have add to cart buttons
             if AddToCart.find_to_cart_elements(driver):
@@ -89,7 +89,7 @@ class AddToCart(IStepActor):
         elements = AddToCart.find_to_cart_elements(driver)
 
         if click_first(driver, elements, try_handle_popups, randomize = True):
-            time.sleep(5)
+            time.sleep(1)
             return States.product_in_cart
         else:
             return state
@@ -100,7 +100,7 @@ class ToShopLink(IStepActor):
         return [States.new]
 
     def find_to_shop_elements(self, driver):
-        return find_buttons_or_links(driver, ["shop", "store", "products"], ["shops", "stores", "shopping"])
+        return find_buttons_or_links(driver, ["shop", "store", "products"], ["shops", "stores", "shopping", "condition", "policy"])
 
     def process_page(self, driver, state, context):
         elements = self.find_to_shop_elements(driver)
@@ -110,6 +110,18 @@ class ToShopLink(IStepActor):
             return state
 
 
+class ClosePopups(IStepActor):
+    def get_states(self):
+        return [States.new]
+    
+    def process_page(self, driver, state, context):
+        if try_handle_popups(driver):
+            logger = logging.getLogger("shop_tracer")
+            logger.info("Popup closed")
+
+        return state
+        
+        
 class ToCartLink(IStepActor):
     def find_to_cart_links(self, driver):
         return find_links(driver, ["cart"], ['add', 'append'])
@@ -127,7 +139,7 @@ class ToCartLink(IStepActor):
                 break
 
             if click_first(driver, btns, randomize = True):
-                time.sleep(5)
+                time.sleep(1)
                 checkouts = ToCheckout.find_checkout_elements(driver)
 
                 if not is_empty_cart(driver) and len(checkouts) > 0:
@@ -174,7 +186,7 @@ class ToCheckout(IStepActor):
         btns = ToCheckout.find_checkout_elements(driver)
 
         if click_first(driver, btns):
-            time.sleep(5)
+            time.sleep(1)
             if not is_empty_cart(driver):
                 if ToCheckout.has_checkout_btns(driver) and max_depth > 0:                    
                     ToCheckout.process(driver, state, max_depth - 1)
@@ -467,7 +479,7 @@ class SearchForProductPage(IStepActor):
         search_input.clear()
         search_input.send_keys(query)
         search_input.send_keys(Keys.ENTER)
-        time.sleep(2)
+        time.sleep(1)
 
         links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
         if len(links) > 0:
@@ -483,7 +495,7 @@ class SearchForProductPage(IStepActor):
         search_input.clear()
         search_input.send_keys(query)
         search_input.send_keys(Keys.ENTER)
-        time.sleep(2)
+        time.sleep(1)
         
         links = driver.find_elements_by_css_selector('ol#b_results > li.b_algo > h2 > a[href]')
         
@@ -529,6 +541,8 @@ class SearchForProductPage(IStepActor):
 
 
 def add_tracer_extensions(tracer):
+    tracer.add_handler(ClosePopups(), 5)
+    
     tracer.add_handler(AddToCart(), 4)
     tracer.add_handler(SearchForProductPage(), 1)
     tracer.add_handler(ToProductPageLink(), 3)
