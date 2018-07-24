@@ -34,17 +34,21 @@ class CheckoutUrlsInfo:
 			writer = csv.writer(f)
 			writer.writerows(list_res)
 
-	def save_in_csv(self, filepath):
-		save_list = []
+	def save_in_csv(self, filepath, fill_added = False):
+		checkout_reach_list = []
+		checkout_fill_list = []
 
 		if self.list_urls:
 			for url in self.list_urls:
-				model = []
 				if self.filling_status[url]:
-					save_list.append([url, 1, 1, 0])
+					checkout_fill_list.append([url, 1, 1, 0])
+					checkout_reach_list.append([url, 1, 1, 0])
 				else:
-					save_list.append([url, 1, 0, 1])
-		self.write_csvfile(filepath, save_list)
+					checkout_reach_list.append([url, 1, 0, 1])
+		self.write_csvfile(filepath, checkout_reach_list)
+
+		if fill_added:
+			self.write_csvfile("fill_checkout.csv", checkout_fill_list)
 
 	def analyze_result(self):
 		filepath="analyze_result.csv"
@@ -53,7 +57,6 @@ class CheckoutUrlsInfo:
 		sum_correct = 0
 		sum_correct_incorrect = 0
 
-		self.save_in_csv(filepath)
 		print("{} of {} checkout reachable urls are working to fill checkout fields".format(len(self.filling_status.keys()), len(self.list_urls)))
 		lists = self.read_csvfile(filepath)
 

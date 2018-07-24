@@ -272,9 +272,16 @@ class ShopTracer:
                 new_state = self.process_state(driver, state, context)
 
                 if state == new_state:
+                    if state == States.checkout_page:
+                        self._analyzer.save_urls(context.domain)
+                        self._analyzer.save_in_csv("reach_checkout.csv")
                     break
-                    
+
                 state = new_state
+
+                if state == States.purchased:
+                    self._analyzer.save_urls(context.domain, True)
+                    self._analyzer.save_in_csv("reach_checkout.csv", True)
                 
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
