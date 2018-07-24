@@ -185,7 +185,7 @@ class PaymentFields(IStepActor):
         if radio_checkbox_btns:
             return radio_checkbox_btns
         else:
-            text_element = find_text_element(driver, ["without*.*account", "guest*.*account", "account*.*guest"])
+            text_element = find_text_element(driver, ["(no|without|free).*account", "guest", "account.*.(no|without|free)"])
             if text_element:
                 return find_sub_elements(driver, text_element.find_element_by_xpath("../.."), ["continue", "checkout"], ["login"])
         return None
@@ -434,7 +434,7 @@ class PaymentFields(IStepActor):
             if order:
                 break
 
-            continue_btns = find_buttons_or_links(driver, ["continu"], ["login"])
+            continue_btns = find_buttons_or_links(driver, ["continu"], ["login", "cancel"])
             flag = False
 
             if continue_btns:
@@ -444,7 +444,7 @@ class PaymentFields(IStepActor):
                     flag = True
                     pass
             if flag or not continue_btns:
-                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express"])
+                forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express", "cancel"])
                 if not forward_btns:
                     logger.debug("Step over error")
                     return False

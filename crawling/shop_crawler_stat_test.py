@@ -20,10 +20,11 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
 
 # Random sample urls
 random.seed(4)
-sample_urls = random.sample(all_urls, 20)
+sample_urls = random.sample(all_urls, 500)
 
 # Some good urls to analyze by hands
 good_urls = [
+    'www.communitysurgical.com',
     'anabolicwarfare.com',
     'dixieems.com',
     'firstfitness.com',
@@ -85,7 +86,7 @@ results = []
 url_analyzer = CheckoutUrlsInfo()
 
 with get_crawler(headless=False) as crawler:
-    for url in good_urls:
+    for url in sample_urls:
         logger.info('\n\nstarted url: {}'.format(url))
         crawler.init_analyzer(url_analyzer)
         status = crawler.crawl(url, 60, attempts=1)

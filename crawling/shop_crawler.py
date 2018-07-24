@@ -240,12 +240,6 @@ class ShopCrawler:
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
 
-        if state == States.checkout_page:
-            if not handlers:
-                self._analyzer.save_urls(context.domain, False)
-            else:
-                self._analyzer.save_urls(context.domain, True)
-
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
@@ -339,9 +333,16 @@ class ShopCrawler:
                             break
 
                 if state == new_state:
+                    if state == States.checkout_page:
+                        self._analyzer.save_urls(context.domain)
+                        self._analyzer.save_in_csv("reach_checkout.csv")
                     break
-                    
+
                 state = new_state
+
+                if state == States.purchased:
+                    self._analyzer.save_urls(context.domain, True)
+                    self._analyzer.save_in_csv("reach_checkout.csv", True)
                 
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
