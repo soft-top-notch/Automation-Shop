@@ -45,3 +45,26 @@ xvfb-run python shop_tracer_stat_test.py
 ```shell
 jupyter-notebook trace_automation/tracing/shop_tracer.ipynb
 ```
+
+### CV + Selenium
+How to work with selenium having coordinates
+```python
+from selenium_helper import *
+
+driver = create_chrome_driver()
+driver.get('https://google.com')
+
+btn = driver.find_element_by_css_selector('input[name="btnK"]')
+text_field = driver.find_element_by_css_selector('input#lst-ib')
+
+def get_element_center(elem):
+    l = elem.location
+    s = elem.size
+    return (l['x'] + s['width'] // 2, l['y'] + s['height'] // 2)
+    
+x, y = get_element_center(text_field)
+enter_text(driver, x, y, 'selenium')
+
+x, y = get_element_center(btn)
+click(driver, x, y)
+```
