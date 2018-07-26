@@ -38,7 +38,7 @@ We can start code that runs tracing on random sample shops code shop_crawler_sta
 ```shell
 sudo apt-get install xvfb
 cd trace_automation/tracing
-xvfb-run python shop_tracer_stat_test.py
+xvfb-run -s "-screen 0 1280x960x16" python shop_tracer_stat_test.py
 ```
 
 3. Or it's possible to run jupyter-notebook 

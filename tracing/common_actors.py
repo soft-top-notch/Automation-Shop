@@ -156,7 +156,7 @@ class ToCheckout(IStepActor):
     @staticmethod
     def find_checkout_elements(driver):
         contains =  ["checkout", "check out"]
-        not_contains = ['guest', 'continue shopping', 'return']
+        not_contains = ['continue shopping', 'return']
         btns = find_buttons_or_links(driver, contains, not_contains)
 
         # if there are buttongs that contains words in text return them first

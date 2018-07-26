@@ -20,7 +20,7 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
 
 # Random sample urls
 random.seed(4)
-sample_urls = random.sample(all_urls, 100)
+sample_urls = random.sample(all_urls, 500)
 
 # Some good urls to analyze by hands
 good_urls = [
@@ -52,7 +52,7 @@ def get_tracer(headless=False):
 
 
 logger = logging.getLogger('shop_tracer')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -62,11 +62,15 @@ logger.addHandler(handler)
 
 results = []
 with get_tracer(headless=False) as tracer:
-    for url in sample_urls:
-        logger.info('\n\nstarted url: {}'.format(url))
-        status = tracer.trace(url, 60, attempts=1)
-        results.append(status)
-        logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
+    with open('url_states.csv', 'a') as f:
+        for url in sample_urls:
+            logger.info('\n\nstarted url: {}'.format(url))
+            status = tracer.trace(url, 60, attempts=1)
+            results.append(status)
+            logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
+            
+            f.write('{}\t{}\n'.format(url, status.state))
+            f.flush()
 
 
 states = {}
