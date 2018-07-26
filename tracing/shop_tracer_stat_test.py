@@ -62,7 +62,7 @@ logger.addHandler(handler)
 
 results = []
 with get_tracer(headless=False) as tracer:
-    with open('url_states.csv', 'a') as f:
+    with open('url_states.csv', 'w') as f:
         for url in sample_urls:
             logger.info('\n\nstarted url: {}'.format(url))
             status = tracer.trace(url, 60, attempts=1)
