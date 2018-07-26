@@ -107,7 +107,7 @@ def get_element_attribute(element):
     return None
 
 
-def create_chrome_driver(chrome_path, headless=True, size = None):
+def create_chrome_driver(chrome_path='/usr/bin/chromedriver', headless=True, size = None):
     options = webdriver.ChromeOptions()
     if headless:
         options.add_argument('--headless')
