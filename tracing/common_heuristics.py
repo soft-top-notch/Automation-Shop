@@ -147,7 +147,14 @@ def is_domain_for_sale(driver, domain):
 
 
 def try_handle_popups(driver):
-    btns = find_buttons_or_links(driver, ["i (.* |)over", "i (.* |)age", "agree", "accept"], ["not ", "under "])
+    contains = ["i (.* |)over", "i (.* |)age", "i (.* |)year", "agree", "accept", "enter "]
+    not_contains = ["not ", "under ", "leave", "login", "log in", "cancel"]
+    
+    btns = find_buttons_or_links(driver, contains, not_contains)
+    if len(btns):
+        checkbtns = find_radio_or_checkbox_buttons(driver, contains, not_contains)
+        click_first(driver, checkbtns)
+                
     result = click_first(driver, btns)
     if result:
         time.sleep(2)
