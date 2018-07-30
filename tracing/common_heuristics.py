@@ -39,7 +39,7 @@ def is_link(driver, elem):
     try:
         href = elem.get_attribute('href')
         href = normalize_url(href)
-        return href and not href.startswith('javascript:') and href != driver.current_url
+        return href and not href.startswith('javascript:')
     except:
         logger = logging.getLogger('shop_tracer')
         logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
@@ -61,6 +61,22 @@ def find_links(driver, contains=None, not_contains=None):
             result.append(link)
 
     return result
+
+
+def find_error_elements(driver, contains=None, not_contains=None):
+    divs = driver.find_elements_by_css_selector("div")
+    spans = driver.find_elements_by_css_selector("span")
+    label = driver.find_elements_by_css_selector("label")
+
+    # Yield isn't good because context can change
+    result = []
+    for div in divs+spans+label:
+        div_class = div.get_attribute("class")
+        if nlp.check_text(div_class, contains, not_contains) and div.get_attribute("innerHTML"):
+            result.append(div)
+
+    return result
+
 
 def find_sub_elements(driver, element, contains=None, not_contains=None):
     links = [elem for elem in element.find_elements_by_tag_name("a") if not is_link(driver, elem)]
@@ -164,12 +180,13 @@ def find_text_element(driver, contains=None, not_contains=None):
     span = driver.find_elements_by_tag_name('span')
     p = driver.find_elements_by_tag_name('p')
     td = driver.find_elements_by_tag_name('td')
+    li = driver.find_elements_by_css_selector('li')
 
     for ind in range(1,6):
         h_elements += driver.find_elements_by_tag_name('h%s' % str(ind))
 
     result = None
-    for elem in label + h_elements + span + p + td:
+    for elem in label + h_elements + span + p + td + li:
         text = elem.get_attribute("outerHTML")
 
         if nlp.check_text(text, contains, not_contains):

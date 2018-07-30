@@ -19,7 +19,7 @@ class States:
     payment_page = "payment_page"
     purchased = "purchased"
 
-    states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
+    states = [new, shop, product_page, product_in_cart, cart_page, checkout_page, payment_page, purchased]
 
 
 class TraceContext:
@@ -175,10 +175,9 @@ class ShopTracer:
     def process_state(self, driver, state, context):
         # Close popups if appeared
         close_alert_if_appeared(self._driver)
-            
+
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
-
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
@@ -272,16 +271,9 @@ class ShopTracer:
                 new_state = self.process_state(driver, state, context)
 
                 if state == new_state:
-                    if state == States.checkout_page:
-                        self._analyzer.save_urls(context.domain)
-                        self._analyzer.save_in_csv("reach_checkout.csv")
                     break
 
                 state = new_state
-
-                if state == States.purchased:
-                    self._analyzer.save_urls(context.domain, True)
-                    self._analyzer.save_in_csv("reach_checkout.csv", True)
                 
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
