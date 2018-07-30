@@ -18,7 +18,7 @@ class States:
     payment_page = "payment_page"
     purchased = "purchased"
 
-    states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
+    states = [new, shop, product_page, product_in_cart, cart_page, checkout_page, payment_page, purchased]
 
 
 class UserInfo:
@@ -59,8 +59,8 @@ class UserInfo:
             "street": self.street,
             "zip": self.zip,
             "city": self.city,
-            "phone": self.phone,
             "email": self.email,
+            "phone": self.phone,
             "password": self.password,
             "company": self.company_name
         }
@@ -93,13 +93,14 @@ class PaymentInfo:
 
 
 class TraceContext:
-    def __init__(self, domain, user_info, payment_info, crawler):
+    def __init__(self, domain, user_info, payment_info, analyzer, crawler):
         self.user_info = user_info
         self.payment_info = payment_info
         self.domain = domain
         self.crawler = crawler
         self.trace_logger = crawler._trace_logger
         self.trace = None
+        self.analyzer = analyzer
         
     def on_started(self):
         self.state = States.new
@@ -133,7 +134,6 @@ class TraceContext:
 
 
 class IStepActor:
-
     @abstractmethod
     def filter_page(self, driver, state, context):
         return True
@@ -178,7 +178,7 @@ class ShopCrawler:
         self._driver = None
         self._trace_logger = trace_logger
         
-        
+
     def __enter__(self):
         pass
     
@@ -236,10 +236,9 @@ class ShopCrawler:
     def process_state(self, driver, state, context):
         # Close popups if appeared
         self.close_popus_if_appeared()
-            
+
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
-
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
@@ -294,7 +293,7 @@ class ShopCrawler:
         driver = self.get_driver()
         state = States.new
 
-        context = TraceContext(domain, self._user_info, self._payment_info, self)
+        context = TraceContext(domain, self._user_info, self._payment_info, self._analyzer, self)
             
         try:
             status = ShopCrawler.get(driver, url, wait_response_seconds)
@@ -333,16 +332,9 @@ class ShopCrawler:
                             break
 
                 if state == new_state:
-                    if state == States.checkout_page:
-                        self._analyzer.save_urls(context.domain)
-                        self._analyzer.save_in_csv("reach_checkout.csv")
                     break
 
                 state = new_state
-
-                if state == States.purchased:
-                    self._analyzer.save_urls(context.domain, True)
-                    self._analyzer.save_in_csv("reach_checkout.csv", True)
                 
         except:
             self._logger.exception("Unexpected exception during processing {}".format(url))
