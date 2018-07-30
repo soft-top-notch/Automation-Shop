@@ -11,7 +11,8 @@ class CheckoutUrlsInfo:
 		self.comment = {}
 
 	def save_urls(self, url, comment, status=1):
-		self.list_urls.append(url)
+		if not url in self.list_urls:
+			self.list_urls.append(url)
 		self.filling_status[url]=status
 		self.comment[url] = comment
 
