@@ -202,6 +202,7 @@ class PaymentFields(IStepActor):
                     context.analyzer.save_urls(context.domain, "Required Login!", 1)
                     return False
 
+
         return True
 
     def get_label_text_with_attribute(self, driver, elem):
@@ -397,7 +398,8 @@ class PaymentFields(IStepActor):
     def check_error(self, driver, context):
         '''Check error elements after clicking order button'''
         error_result = []
-        error_elements = find_error_elements(driver, ["error", "err", "alert", "advice"])
+        error_elements = find_error_elements(driver, ["error", "err", "alert", "advice"], ["override"])
+        time.sleep(2)
         required_fields = driver.find_elements_by_css_selector("input")
         required_fields += driver.find_elements_by_css_selector("select")
         if error_elements:
@@ -431,8 +433,6 @@ class PaymentFields(IStepActor):
             else:
                 context.analyzer.save_urls(context.domain, "\n".join(error_result), 2)
             return False
-        else:
-            context.analyzer.save_urls(context.domain, "Successed!", 3)
         return True
 
     def click_to_order(self, driver, context):
@@ -442,6 +442,7 @@ class PaymentFields(IStepActor):
         payment_url = None
         try_cnt = 0
         while True:
+            is_userinfo = True
             if try_cnt >= 6:
                 logger.debug("Error found in filling all fields")
                 return_flag = False
@@ -449,13 +450,13 @@ class PaymentFields(IStepActor):
 
             if not self.fill_billing_address(driver, context):
                 print("Billing information is already inputed or something wrong!")
+                is_userinfo = False
             if not is_paymentinfo:
                 if self.fill_payment_info(driver, context):
                     is_paymentinfo = True
                 else:
                     if self.check_iframe_and_fill(driver, context):
                         is_paymentinfo = True
-
             order = find_buttons(
                 driver,
                 ["order", "checkout", "payment"],
@@ -487,16 +488,13 @@ class PaymentFields(IStepActor):
                 break
 
             continue_btns = find_buttons_or_links(driver, ["continu"], ["login", "cancel"])
-            if not continue_btns:
-                try_cnt += 1
-                continue
-            text = continue_btns[len(continue_btns) - 1].get_attribute("outerHTML")
-            if nlp.check_text(text, ["order", "pay"], ["payment"]):
-                order = [continue_btns[len(continue_btns) -1]]
-                break
             flag = False
 
             if continue_btns:
+                text = continue_btns[len(continue_btns) - 1].get_attribute("outerHTML")
+                if nlp.check_text(text, ["order", "pay"], ["payment"]):
+                    order = [continue_btns[len(continue_btns) -1]]
+                    break
                 try:
                     continue_btns[len(continue_btns) - 1].click()
                 except:
@@ -505,15 +503,20 @@ class PaymentFields(IStepActor):
             if flag or not continue_btns:
                 forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express", "cancel"])
                 if not forward_btns:
-                    logger.debug("Proceed button not found in step")
-                    context.analyzer.save_urls(context.domain, "Proceed button not found in step", 2)
+                    if not is_userinfo:
+                        if self.check_error(driver, context):
+                            logger.debug("Wrong reached to Checkout page")
+                            context.analyzer.save_urls(context.domain, "Wrong reached to checkout page", 1)
+                    else:
+                        logger.debug("Proceed button not found in step")
+                        context.analyzer.save_urls(context.domain, "Proceed button not found in step", 2)
                     return_flag = False
                     break
                 forward_btns[len(forward_btns) - 1].click()
+            time.sleep(2.5)
             if not self.check_error(driver, context):
                 return_flag = False
                 break
-            time.sleep(2)
             try_cnt += 1
 
         if not return_flag:
@@ -532,16 +535,31 @@ class PaymentFields(IStepActor):
             driver.get(payment_url)
 
         if not is_paymentinfo:
-            if not self.fill_payment_info(driver, context) and not self.check_iframe_and_fill(driver, context):
-                logging.debug("Payment information is already inputed or error!")
-            pay_button = find_buttons_or_links(
-                driver,
-                ["pay", "order"]
-            )
-            if not self.click_one_element(pay_button):
-                logging.debug("Pay or order button error!")
+            for _ in (0, 2):
+                pay_button = find_buttons_or_links(
+                    driver,
+                    ["pay", "order"]
+                )
+                if pay_button:
+                    if not self.fill_payment_info(driver, context) and not self.check_iframe_and_fill(driver, context):
+                        logging.debug("Payment information is already inputed or payment field not exist!")
+                    else:
+                        is_paymentinfo = True
+                    if not self.click_one_element(pay_button):
+                        logging.debug("Pay or order button error!")
+                    else:
+                        time.sleep(3)
+                else:
+                    if not is_paymentinfo:
+                        logging.debug("Payment information can not be inputed!")
+                        context.analyzer.save_urls(context.domain, "Payment information can not be inputed!", 2)
+                        return False
+                    break
 
         return_flag = self.check_error(driver, context)
+
+        if return_flag:
+            context.analyzer.save_urls(context.domain, "Successed!", 3)
 
         return return_flag
 
