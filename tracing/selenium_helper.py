@@ -243,3 +243,27 @@ def get_full_page_screenshot(driver, output_file, scale):
                 os.remove(screen)
  
     return output_file
+
+def is_js_function_exists(driver, function):
+    return driver.execute_script('return typeof {} === "function"'.format(function))
+
+def add_scripts_if_need(driver, file='js/selenium.js', function_to_check = "__tra_sleep"):
+    if is_js_function_exists(driver, function_to_check):
+        return
+    
+    with open(file) as f:
+        script = '\n'.join([line for line in f])
+        driver.execute_script(script)
+
+def execute_async(driver, script):    
+    script = "done = arguments[0];" + \
+        script + ".then(result => {done(result)})"
+    
+    return driver.execute_async_script(script)
+
+def extract_combo_values(driver, left, top, height):
+    add_scripts_if_need(driver)
+    
+    script =  '__tra_extractComboValues({},{},{})'.format(left, top, height)
+    return execute_async(driver, script)
+
