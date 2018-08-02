@@ -114,8 +114,9 @@ def find_buttons(driver, contains=None, not_contains=None):
     for elem in links + buttons + inputs + submits + links + imgs:
         if not can_click(elem):
             continue
-
-        text = elem.get_attribute("outerHTML")
+        text = elem.get_attribute("innerHTML").strip() + \
+               elem.text + " " + \
+               (elem.get_attribute("value") if elem.get_attribute("value")  else "")
         if nlp.check_text(text, contains, not_contains):
             result.append(elem)
 
