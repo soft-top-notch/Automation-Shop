@@ -297,7 +297,9 @@ class PaymentFields(IStepActor):
                                  not_extra_contains=None,
                                  not_contains=None
                                  ):
-        logger = logging.getLogger('shop_crawler')
+
+        logger = logging.getLogger('shop_tracer')
+
         success_flag = False
         inputed_fields_cnt = 0
 
@@ -483,8 +485,9 @@ class PaymentFields(IStepActor):
 
     def click_to_order(self, driver, context):
         logger = logging.getLogger('shop_tracer')
-        dest = []
-        is_paymentinfo = True
+
+        return_flag = True
+        is_paymentinfo = False
         payment_url = None
         try_cnt = 0
         while True:
@@ -567,7 +570,7 @@ class PaymentFields(IStepActor):
 
         '''paying or clicking place order for paying...'''
         order[0].click()
-        time.sleep(16)
+        time.sleep(5)
 
         '''paying if payment info is not inputed'''
         if payment_url:

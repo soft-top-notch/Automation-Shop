@@ -6,6 +6,7 @@ import traceback
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of
+from selenium.common.exceptions import UnexpectedAlertPresentException
 
 import tempfile
 import os
@@ -21,15 +22,29 @@ class Frame:
     def __enter__(self):
         if self.frame:
             self.driver.switch_to.frame(self.frame)
-            self.url = self.driver.current_url
+            self.url = get_url(self.driver)
 
     def __exit__(self, type, value, traceback):
         if self.frame:
-            url = self.driver.current_url
+            url = get_url(self.driver)
             
             # ToDo Do checks without ancors
             if url == self.url and not is_stale(self.frame):
                 self.driver.switch_to.default_content()
+
+                
+def get_url(driver, attempts = 2):
+    try:
+        return driver.current_url
+    except UnexpectedAlertPresentException:
+        if attempts > 1:
+            close_alert_if_appeared(driver)
+            return get_url(driver, attempts - 1)
+        else:
+            return None
+    except:
+        return None
+    
 
 
 def is_stale(elem):
