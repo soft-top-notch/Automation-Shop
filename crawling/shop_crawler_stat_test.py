@@ -11,22 +11,43 @@ from contextlib import contextmanager
 
 # All urls
 all_urls = []
-with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
+with open('../resources/url_states.csv', 'r') as f:
     rows = csv.reader(f)
-    for row in rows:
-        url = row[0]
-        if url:
-            all_urls.append(url)
+    for row in list(rows):
+        url_list = row[0].split("\t")
+        if url_list[1] == "checkout_page" or url_list[1] == "purchased":
+            all_urls.append(url_list[0])
 
 # Random sample urls
 random.seed(4)
-sample_urls = random.sample(all_urls, 500)
+sample_urls = random.sample(all_urls, 5)
 
 # Some good urls to analyze by hands
 good_urls = [
+    'spotofdelight.com',
+    'anthonyscigars.com',
+    'whatsmyscent.com',
+    'musclesoft.com',
+    'cbdevangelist.com',
+    'siskiyouseeds.com',
+    'nombaone.com',
+    'naturesbestrelief.com',
+    'nutrastore.com',
+    'theexpressdiabetic.com',
+    'pradopaintingcorp.com',
+    'baypointedermatology.com',
+    'jamesmedical.net',
+    'earthlymist.com',
+    'melandrose.com',
+    'larofarms.com',
+    'triumphlifesavers.com',
+    'dixieems.com',
+    'thecandygiftbasket.com',
+    'herbalcafeorganics.com',
+    'flamme.us',
+    'reelsmokers.net',
     'www.communitysurgical.com',
     'anabolicwarfare.com',
-    'dixieems.com',
     'firstfitness.com',
     'theglamourshop.com',
     'sandlakedermatology.com',
@@ -86,7 +107,7 @@ results = []
 url_analyzer = CheckoutUrlsInfo()
 
 with get_crawler(headless=False) as crawler:
-    for url in sample_urls:
+    for url in all_urls:
         logger.info('\n\nstarted url: {}'.format(url))
         crawler.init_analyzer(url_analyzer)
         status = crawler.crawl(url, 60, attempts=1)
