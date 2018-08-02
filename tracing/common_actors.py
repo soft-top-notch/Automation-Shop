@@ -17,23 +17,6 @@ from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import ElementNotVisibleException, TimeoutException, StaleElementReferenceException
 
 
-def wait_until_attribute_disappear(driver, attr_type, attr_name):
-    try:
-        if attr_type == "id":
-            element = WebDriverWait(driver, 2).until(
-                EC.invisibility_of_element_located((By.ID, attr_name))
-            )
-        elif attr_type == "name":
-                element = WebDriverWait(driver, 2).until(
-                    EC.invisibility_of_element_located((By.NAME, attr_name))
-                )
-    except TimeoutException:
-        print('The element does not disappear')
-        return False
-
-    return True
-
-
 class ToProductPageLink(IStepActor):
     def get_states(self):
         return [States.new, States.shop]
@@ -508,6 +491,7 @@ class PaymentFields(IStepActor):
 
     def click_to_order(self, driver, context):
         logger = logging.getLogger('shop_tracer')
+
         return_flag = True
         is_paymentinfo = False
         payment_url = None

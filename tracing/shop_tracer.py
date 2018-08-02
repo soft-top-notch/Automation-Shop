@@ -267,6 +267,7 @@ class ShopTracer:
                 return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
+
             while state != States.purchased:
                 new_state = self.process_state(driver, state, context)
 
