@@ -213,7 +213,8 @@ class PaymentFields(IStepActor):
             if password_fields[0].is_displayed():
                 if not self.find_auth_pass_elements(driver):
                     logger.debug("We can't use this url! Login password required!")
-                    context.analyzer.save_urls(context.domain, "Required Login!", 1)
+                    
+#                     context.analyzer.save_urls(context.domain, "Required Login!", 1)
                     return False
         return True
 
@@ -221,7 +222,7 @@ class PaymentFields(IStepActor):
         return_flag = True
 
         if not self.check_login(driver, context):
-            context.analyzer.save_in_csv("analyzing_urls.csv")
+#             context.analyzer.save_in_csv("analyzing_urls.csv")
             return_flag = False
         return return_flag
 
@@ -476,10 +477,10 @@ class PaymentFields(IStepActor):
                     time.sleep(2)
                     pass
 
-            if not error_result:
-                context.analyzer.save_urls(context.domain, "Input data not correct", 2)
-            else:
-                context.analyzer.save_urls(context.domain, "\n".join(error_result), 2)
+#             if not error_result:
+#                 context.analyzer.save_urls(context.domain, "Input data not correct", 2)
+#             else:
+#                 context.analyzer.save_urls(context.domain, "\n".join(error_result), 2)
             return False
         return True
 
@@ -550,8 +551,8 @@ class PaymentFields(IStepActor):
             if flag or not continue_btns:
                 forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express", "cancel"])
                 if not forward_btns:
-                    if is_userinfo or is_paymentinfo:
-                        context.analyzer.save_urls(context.domain, "Proceed button not found!", 2)
+#                     if is_userinfo or is_paymentinfo:
+#                         context.analyzer.save_urls(context.domain, "Proceed button not found!", 2)
                     return_flag = False
                     break
                 forward_btns[len(forward_btns) - 1].click()
@@ -593,14 +594,14 @@ class PaymentFields(IStepActor):
                 else:
                     if not is_paymentinfo:
                         logging.debug("Payment information can not be inputed!")
-                        context.analyzer.save_urls(context.domain, "Payment information can not be inputed!", 2)
+#                         context.analyzer.save_urls(context.domain, "Payment information can not be inputed!", 2)
                         return False
                     break
 
         return_flag = self.check_error(driver, context)
 
-        if return_flag:
-            context.analyzer.save_urls(context.domain, "Successed!", 3)
+#         if return_flag:
+#             context.analyzer.save_urls(context.domain, "Successed!", 3)
 
         return return_flag
 
@@ -619,7 +620,7 @@ class PaymentFields(IStepActor):
 
         #the case if authentication is not requiring....
         filling_result = self.click_to_order(driver, context)
-        context.analyzer.save_in_csv("analyzing_urls.csv")
+#         context.analyzer.save_in_csv("analyzing_urls.csv")
         if not filling_result:
             return state
 

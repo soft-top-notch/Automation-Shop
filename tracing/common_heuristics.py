@@ -36,10 +36,12 @@ def normalize_url(url):
 
 
 def is_link(driver, elem):
+    current_url = normalize_url(get_url(driver))
+    
     try:
         href = elem.get_attribute('href')
         href = normalize_url(href)
-        return href and not href.startswith('javascript:')
+        return href and not href.startswith('javascript:') and href != current_url
     except:
         logger = logging.getLogger('shop_tracer')
         logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
@@ -127,7 +129,25 @@ def find_buttons_or_links(driver, contains=None, not_contains=None):
     return find_links(driver, contains, not_contains) + \
             find_buttons(driver, contains, not_contains)
 
-def click_first(driver, elements, on_error=None, randomize = False):
+
+def try_handle_popups(driver):
+    contains = ["i (.* |)over", "i (.* |)age", "i (.* |)year", "agree", "accept", "enter "]
+    not_contains = ["not ", "under ", "leave", "login", "log in", "cancel"]
+    
+    btns = find_buttons_or_links(driver, contains, not_contains)
+    if len(btns):
+        checkbtns = find_radio_or_checkbox_buttons(driver, contains, not_contains)
+        click_first(driver, checkbtns, None)
+                
+    
+    result = click_first(driver, btns, None)
+    if result:
+        time.sleep(2)
+    
+    return result
+
+
+def click_first(driver, elements, on_error=try_handle_popups, randomize = False):
     def process(element):
         try:
             # process links by opening url
@@ -207,18 +227,3 @@ def is_domain_for_sale(driver, domain):
     text = get_page_text(driver)
     return nlp.check_if_domain_for_sale(text, domain)
 
-
-def try_handle_popups(driver):
-    contains = ["i (.* |)over", "i (.* |)age", "i (.* |)year", "agree", "accept", "enter "]
-    not_contains = ["not ", "under ", "leave", "login", "log in", "cancel"]
-    
-    btns = find_buttons_or_links(driver, contains, not_contains)
-    if len(btns):
-        checkbtns = find_radio_or_checkbox_buttons(driver, contains, not_contains)
-        click_first(driver, checkbtns)
-                
-    result = click_first(driver, btns)
-    if result:
-        time.sleep(2)
-    
-    return result
