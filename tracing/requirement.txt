@@ -1,0 +1,4 @@
+wrapt
+requests
+lxml
+image
