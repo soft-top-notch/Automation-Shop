@@ -272,8 +272,6 @@ class PaymentFields(IStepActor):
             sel = self.find_select_element(driver, item, ['ex1', 'ex'])
             if not sel:
                 continue
-            import pdb;
-            pdb.set_trace()
             for option in sel.find_elements_by_css_selector("option"):
                 text = option.text + " " + option.get_attribute("innerHTML").strip()
                 if nlp.check_text(text, [
@@ -449,8 +447,6 @@ class PaymentFields(IStepActor):
                         text = nlp.remove_elements(element.get_attribute("innerHTML").strip(), ["/", "*", "-", "_", ":", " "]).lower()
                         for field in required_fields:
                             if field.is_displayed():
-                                import pdb;
-                                pdb.set_trace()
                                 label_text = self.get_label_text_with_attribute(driver, field)
                                 if label_text and nlp.check_text(text, [label_text]):
                                     error_result.append(label_text + " field required")
@@ -480,8 +476,6 @@ class PaymentFields(IStepActor):
                     time.sleep(2)
                     pass
 
-            import pdb;
-            pdb.set_trace()
             if not error_result:
                 context.analyzer.save_urls(context.domain, "Input data not correct", 2)
             else:
@@ -554,8 +548,6 @@ class PaymentFields(IStepActor):
                     flag = True
                     pass
             if flag or not continue_btns:
-                import pdb;
-                pdb.set_trace()
                 forward_btns = find_buttons_or_links(driver, ["bill", "proceed"], ["modify", "express", "cancel"])
                 if not forward_btns:
                     if is_userinfo or is_paymentinfo:

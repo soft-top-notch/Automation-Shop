@@ -53,7 +53,7 @@ def find_links(driver, contains=None, not_contains=None):
         if not can_click(link) or not is_link(driver, link):
             continue
 
-        if driver.current_url == link.get_attribute("href"):
+        if get_url(driver) == link.get_attribute("href"):
             continue
 
         text = link.get_attribute("outerHTML")
