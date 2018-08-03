@@ -106,7 +106,7 @@ class IStepActor:
 class ShopTracer:
     def __init__(self,
                  get_user_data,
-                 chrome_path='/usr/local/chromedriver',
+                 chrome_path='/usr/bin/chromedriver',
                  headless=False,
                  # Must be an instance of ITraceSaver
                  trace_logger = None

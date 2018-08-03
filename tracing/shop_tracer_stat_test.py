@@ -40,12 +40,9 @@ good_urls = [
 ]
 
 
-selenium_path = '/usr/bin/chromedriver'
-
 @contextmanager
 def get_tracer(headless=False):
-    global selinium_path
-    tracer = ShopTracer(user_data.get_user_data, selenium_path, headless=headless)
+    tracer = ShopTracer(user_data.get_user_data, headless=headless)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
@@ -60,12 +57,24 @@ formatter = logging.Formatter(
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+# ToDo remove before merge
+import csv
+
+urls_to_test = []
+with open('../resources/url_states.csv') as f:
+    reader = csv.reader(f, delimiter='\t', quotechar='\\')
+    for row in reader:
+        url, status = row
+        if status == "checkout_page" or status == "purchased":
+            urls_to_test.append(url)
+
+
 results = []
 with get_tracer(headless=False) as tracer:
     with open('url_states.csv', 'w') as f:
-        for url in sample_urls:
+        for url in urls_to_test:
             logger.info('\n\nstarted url: {}'.format(url))
-            status = tracer.trace(url, 60, attempts=1)
+            status = tracer.trace(url, 60, attempts=3)
             results.append(status)
             logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
             
