@@ -11,7 +11,8 @@ class UserInfo:
                  state,
                  country,
                  phone,
-                 email
+                 email,
+                 password
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -23,6 +24,7 @@ class UserInfo:
         self.country = country
         self.phone = phone
         self.email = email
+        self.password = password
 
     def get_json_userinfo(self):
         return {
@@ -36,6 +38,7 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
+            "password": self.password
         }
 
 
@@ -60,6 +63,7 @@ class PaymentInfo:
             "number": self.card_number,
             "name": self.card_name,
             "type": self.card_type,
+            "expdate": self.expire_date_month + self.expire_date_year,
             "cvc": self.cvc,
         }
 
@@ -71,6 +75,7 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
     address = data['Street:'].split(' ')
     home = address[0]
     street = " ".join(address[1:])
+    password = "Pass123"
 
     user_info = UserInfo(
         data['First Name:'],
@@ -82,7 +87,8 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
         data['State:'],
         data['Country'],
         data['Phone:'],
-        data['E-mail:']
+        data['E-mail:'],
+        password
     )
 
     month, year = data['CC exp. date:'].split('/')
