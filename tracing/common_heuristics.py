@@ -28,6 +28,7 @@ def find_elements_with_attribute(driver,
                                 attr_content):
     return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
+
 def normalize_url(url):
     if not url:
         return url
@@ -74,12 +75,15 @@ def find_error_elements(driver, contains=None, not_contains=None):
 
     # Yield isn't good because context can change
     result = []
-    for div in divs + spans + label + p + ul:
-        if div.is_displayed():
-            div_class = div.get_attribute("class")
-            if nlp.check_text(div_class, contains, not_contains) and div.get_attribute("innerHTML").strip():
-                result.append(div)
-
+    try:
+        for div in divs + spans + label + p + ul:
+            if div.is_displayed():
+                div_class = div.get_attribute("class")
+                if nlp.check_text(div_class, contains, not_contains) and div.get_attribute("innerHTML").strip():
+                    result.append(div)
+    except:
+        result = []
+        pass
     return result
 
 

@@ -189,6 +189,8 @@ def get_name_of_state(state):
         'WY': 'Wyoming',
     }
 
+    if state == 'DC':
+        state = 'DE'
     return us_state_abbrev[state]
 
 
