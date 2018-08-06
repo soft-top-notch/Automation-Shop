@@ -195,7 +195,7 @@ class PaymentFields(IStepActor):
     def find_auth_pass_elements(self, driver):
         radio_checkbox_btns = find_radio_or_checkbox_buttons(
             driver,
-            ["guest", "create*.*later", "copy*.*ship", "copy*.*bill", "skip*.*login",]
+            ["guest", "create*.*later", "copy*.*ship", "copy*.*bill", "skip*.*login", "register"]
         )
         if radio_checkbox_btns:
             return radio_checkbox_btns
@@ -204,7 +204,7 @@ class PaymentFields(IStepActor):
             if text_element:
                 pass_button = []
 
-                for button in find_buttons(driver, ["continue", "checkout", "check out" "go", "create.*.account"], ["login"]):
+                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out" "go", "create.*.account", "new.*.customer"], ["login"]):
                     if button.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     pass_button.append(button)
