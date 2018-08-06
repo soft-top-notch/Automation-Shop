@@ -42,7 +42,7 @@ class ToProductPageLink(IStepActor):
 
             url = ShopTracer.normalize_url(link)
             driver.get(url)
-            time.sleep(1)
+            time.sleep(3)
             
             # Check that have add to cart buttons
             if AddToCart.find_to_cart_elements(driver):
@@ -72,7 +72,7 @@ class AddToCart(IStepActor):
         elements = AddToCart.find_to_cart_elements(driver)
 
         if click_first(driver, elements, try_handle_popups, randomize = True):
-            time.sleep(1)
+            time.sleep(3)
             return States.product_in_cart
         else:
             return state
@@ -122,7 +122,7 @@ class ToCartLink(IStepActor):
                 break
 
             if click_first(driver, btns, randomize = True):
-                time.sleep(1)
+                time.sleep(3)
                 checkouts = ToCheckout.find_checkout_elements(driver)
 
                 if not is_empty_cart(driver) and len(checkouts) > 0:
@@ -169,7 +169,7 @@ class ToCheckout(IStepActor):
         btns = ToCheckout.find_checkout_elements(driver)
 
         if click_first(driver, btns):
-            time.sleep(1)
+            time.sleep(3)
             close_alert_if_appeared(driver)
             if not is_empty_cart(driver):
                 if ToCheckout.has_checkout_btns(driver) and max_depth > 0:                    
@@ -681,13 +681,13 @@ class SearchForProductPage(IStepActor):
         
     def search_in_google(self, driver, query):
         driver.get('https://www.google.com')
-        time.sleep(1)
+        time.sleep(3)
 
         search_input = driver.find_element_by_css_selector('input.gsfi')
         search_input.clear()
         search_input.send_keys(query)
         search_input.send_keys(Keys.ENTER)
-        time.sleep(1)
+        time.sleep(3)
 
         links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
         if len(links) > 0:
@@ -697,13 +697,13 @@ class SearchForProductPage(IStepActor):
 
     def search_in_bing(self, driver, query):
         driver.get('https://www.bing.com')
-        time.sleep(1)
+        time.sleep(3)
 
         search_input = driver.find_element_by_css_selector('input.b_searchbox')
         search_input.clear()
         search_input.send_keys(query)
         search_input.send_keys(Keys.ENTER)
-        time.sleep(1)
+        time.sleep(3)
         
         links = driver.find_elements_by_css_selector('ol#b_results > li.b_algo > h2 > a[href]')
         
