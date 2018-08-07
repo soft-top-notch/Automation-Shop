@@ -192,7 +192,7 @@ class PaymentFields(IStepActor):
 
         return pwd_inputs
 
-    def find_auth_pass_elements(self, driver):
+    def find_auth_pass_buttons(self, driver):
         radio_checkbox_btns = find_radio_or_checkbox_buttons(
             driver,
             ["guest", "create*.*later", "copy*.*ship", "copy*.*bill", "skip*.*login", "register"]
@@ -200,7 +200,7 @@ class PaymentFields(IStepActor):
         if radio_checkbox_btns:
             return radio_checkbox_btns
         else:
-            text_element = find_text_element(driver, ["(no|without|free|create).*account", "guest", "account.*.(no|without|free)"])
+            text_element = find_text_element(driver, ["guest", "(no|without|free|create).*account", "account.*.(no|without|free)"])
             if text_element:
                 pass_button = []
 
@@ -212,6 +212,19 @@ class PaymentFields(IStepActor):
                 return pass_button
         return None
 
+    def new_account_field_exist(self, driver, create_new_field):
+        text_element = find_text_element(driver, ["(no|without|free|create).*account", "guest", "account.*.(no|without|free)"])
+
+        if not text_element:
+            return False
+
+        password_field = text_element.find_element_by_xpath("../..")
+        password_field = password_field.find_element_by_css_selector("input[type='password']")
+
+        if password_field and password_field == create_new_field:
+            return True
+        return False
+
     def check_login(self, driver, context):
         password_fields = self.find_pwd_in_checkout(driver)
         logger = logging.getLogger("shop_tracer")
@@ -220,10 +233,10 @@ class PaymentFields(IStepActor):
             if len(password_fields) >= 2:
                 return True
             if password_fields[0].is_displayed():
-                if not self.find_auth_pass_elements(driver):
-                    logger.debug("We can't use this url! Login password required!")
-                    return False
-
+                if not self.find_auth_pass_buttons(driver):
+                    if not self.new_account_field_exist(driver, password_fields[0]):
+                        logger.debug("We can't use this url! Login password required!")
+                        return False
         return True
 
     def filter_page(self, driver, state, context):
@@ -650,7 +663,7 @@ class PaymentFields(IStepActor):
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
         time.sleep(4)
-        auth_pass = self.find_auth_pass_elements(driver)
+        auth_pass = self.find_auth_pass_buttons(driver)
         if auth_pass:
             #create an account as guest....
             if not click_first(driver, auth_pass):
