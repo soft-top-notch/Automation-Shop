@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import ElementNotVisibleException, TimeoutException, StaleElementReferenceException
+from selenium.common.exceptions import ElementNotVisibleException, TimeoutException, StaleElementReferenceException, NoSuchElementException
 
 
 class ToProductPageLink(IStepActor):
@@ -204,7 +204,7 @@ class PaymentFields(IStepActor):
             if text_element:
                 pass_button = []
 
-                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out" "go", "create.*.account", "new.*.customer"], ["login"]):
+                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "go", "create.*.account", "new.*.customer"], ["login"]):
                     if button.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     pass_button.append(button)
@@ -213,13 +213,16 @@ class PaymentFields(IStepActor):
         return None
 
     def new_account_field_exist(self, driver, create_new_field):
-        text_element = find_text_element(driver, ["(no|without|free|create).*account", "guest", "account.*.(no|without|free)"])
+        text_element = find_text_element(driver, ["(no|without|free|create).*account", "guest", "account.*.(no|without|free)"], ["login","signin"])
 
         if not text_element:
             return False
 
         password_field = text_element.find_element_by_xpath("../..")
-        password_field = password_field.find_element_by_css_selector("input[type='password']")
+        try:
+            password_field = password_field.find_element_by_css_selector("input[type='password']")
+        except NoSuchElementException:
+            return False
 
         if password_field and password_field == create_new_field:
             return True
@@ -399,7 +402,7 @@ class PaymentFields(IStepActor):
         select_contains = ["country", "state", "zone"]
         not_extra_contains = ["email", "address2", "firstname", "lastname", "street"]
         extra_contains = [
-            ["fname,namefirst", "firstname"],
+            ["fname,namefirst,username", "firstname"],
             ["lname,namelast", "lastname"],
             ["comp", "company"],
             ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
@@ -429,7 +432,7 @@ class PaymentFields(IStepActor):
             ["mm(|\w+)yy,(\w\w|\d\d)/(\w\w|\d\d)", "expdate"],
             ["c\w+(num|num\w+)", "number"],
             ["exp", "expdate"],
-            ["verif.*,sec.*,cv,ccc,cc\wc,csc", "cvc"]
+            ["verif.*,sec.*,cv,ccc,cc\wc,csc,card code", "cvc"]
         ]
         not_contains = [
             "first", "last", "phone", "company",
@@ -557,7 +560,7 @@ class PaymentFields(IStepActor):
             order = find_buttons(
                 driver,
                 ["order", "pay", "checkout", "payment", "create*.*account"],
-                ["add", "modify", "coupon", "express", "continu", "border", "proceed"]
+                ["add", "modify", "coupon", "express", "continu", "border", "proceed", "review"]
             )
 
             agree_btns = find_radio_or_checkbox_buttons(
@@ -608,7 +611,7 @@ class PaymentFields(IStepActor):
                         logging.debug("Proceed button not found!")
                     return_flag = False
                     break
-                forward_btns[len(forward_btns) - 1].click()
+                driver.execute_script("arguments[0].click();",forward_btns[len(forward_btns) - 1])
             time.sleep(7)
             if not self.check_error(driver, context):
                 logging.debug("Error found in checking!")
@@ -623,8 +626,9 @@ class PaymentFields(IStepActor):
             payment_url = order[0].get_attribute('href')
 
         '''paying or clicking place order for paying...'''
-        order[0].click()
+        driver.execute_script("arguments[0].click();", order[0])
         time.sleep(5)
+
         if not self.check_error(driver, context):
             return False
 
