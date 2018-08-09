@@ -110,3 +110,19 @@ window.__tra_selectComboboxValue = async function(left, top, height, text_value)
     }
 }
 
+
+window.__tra_gatherClickElements = function(curnode, gathered) {
+    if (!curnode)
+        curnode = document.documentElement
+    if(!gathered) 
+        gathered = [];
+    
+    if (typeof curnode.onclick === 'function')
+        gathered.push(curnode);
+    
+    curnode.childNodes.forEach(function(child) {
+        __tra_gatherClickElements(child, gathered);       
+    });
+    
+    return gathered;
+}

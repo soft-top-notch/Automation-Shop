@@ -1,4 +1,5 @@
-from selenium_helper import *
+from selenium_utils.common import *
+from selenium_utils.controls import *
 import nlp
 import time
 import logging
@@ -23,32 +24,12 @@ def find_radio_or_checkbox_buttons(driver,
     return result
 
 
-def normalize_url(url):
-    if not url:
-        return url
-    
-    return url[:url.index('#')] if '#' in url else url
-
-
-def is_link(driver, elem):
-    try:
-        href = elem.get_attribute('href')
-        href = normalize_url(href)
-        return href and not href.startswith('javascript:') and href != driver.current_url
-    except:
-        logger = logging.getLogger('shop_tracer')
-        logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
-        return False
-
 
 def find_links(driver, contains=None, not_contains=None):
-    links = driver.find_elements_by_css_selector("a[href]")
     result = []
-    for link in links:
-        if not can_click(link) or not is_link(driver, link):
-            continue
 
-        if driver.current_url == link.get_attribute("href"):
+    for link in get_links(driver):
+        if not can_click(link):
             continue
 
         text = link.get_attribute("outerHTML")
@@ -60,15 +41,9 @@ def find_links(driver, contains=None, not_contains=None):
 
 def find_buttons(driver, contains=None, not_contains=None):
     
-    links = [elem for elem in driver.find_elements_by_tag_name("a") if not is_link(driver, elem)]
-    buttons = driver.find_elements_by_tag_name("button")
-    inputs = driver.find_elements_by_css_selector('input[type="button"]')
-    submits = driver.find_elements_by_css_selector('input[type="submit"]')
-    imgs = driver.find_elements_by_css_selector('input[type="image"]')
-
     # Yield isn't good because context can change
     result = []
-    for elem in links + buttons + inputs + submits + links + imgs:
+    for elem in get_buttons(driver):
         if not can_click(elem):
             continue
 
@@ -83,12 +58,13 @@ def find_buttons_or_links(driver, contains=None, not_contains=None):
     return find_links(driver, contains, not_contains) + \
             find_buttons(driver, contains, not_contains)
 
+
 def click_first(driver, elements, on_error=None, randomize = False):
     def process(element):
         try:
             # process links by opening url
             href = element.get_attribute("href")
-            if is_link(driver, element):
+            if is_link(element):
                 driver.get(href)
                 return True
 
@@ -133,7 +109,6 @@ def click_first(driver, elements, on_error=None, randomize = False):
                 return True
 
     return False
-
 
 
 def is_empty_cart(driver):

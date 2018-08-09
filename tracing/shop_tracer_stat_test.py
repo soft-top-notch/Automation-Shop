@@ -3,9 +3,9 @@ import csv
 import logging
 
 from shop_tracer import *
-from selenium_helper import *
 import common_actors
 import user_data
+from status import *
 
 from contextlib import contextmanager
 
@@ -40,12 +40,9 @@ good_urls = [
 ]
 
 
-selenium_path = '/usr/bin/chromedriver'
-
 @contextmanager
 def get_tracer(headless=False):
-    global selinium_path
-    tracer = ShopTracer(user_data.get_user_data, selenium_path, headless=headless)
+    tracer = ShopTracer(user_data.get_user_data, headless=headless)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer

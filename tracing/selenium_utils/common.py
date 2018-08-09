@@ -43,7 +43,7 @@ def can_click(element):
         logger = logging.getLogger('shop_tracer')
         exception = traceback.format_exc()
         logger.debug('during check if can click exception was thrown {}'.format(exception))
-        
+
         return False
 
 
@@ -333,67 +333,3 @@ def get_full_page_screenshot(driver, output_file, scale):
     return output_file
 
 
-def is_js_function_exists(driver, function):
-    """
-    Detects if js function is defined in the current Web Driver Page
-    :param driver:    Web driver
-    :param function:  Javascript function
-    :return:          If function is defined
-    """
-    return driver.execute_script('return typeof {} === "function"'.format(function))
-
-
-def add_scripts_if_need(driver, file='js/selenium.js', function_to_check = "__tra_sleep"):
-    """
-    Adds javascript file to current page
-    :param driver:             Web driver
-    :param file:               Path to local js file to add
-    :param function_to_check:  Function to check weather file has already been added
-    """
-    if function_to_check is not None and is_js_function_exists(driver, function_to_check):
-        return
-    
-    with open(file) as f:
-        script = '\n'.join([line for line in f])
-        driver.execute_script(script)
-
-
-def execute_async(driver, script):
-    """
-    Executes script async returning value from callback continuation
-    :param driver:   Web driver
-    :param script:   Script that defines Promise
-    :return:         Value after waiting for Promise result
-    """
-    full_script = "done = arguments[0];" + \
-        script + ".then(result => {done(result)})"
-    
-    return driver.execute_async_script(full_script)
-
-
-def extract_combobox_values(driver, left, top, height):
-    """
-    Extracts combobox values by it's location
-    :param driver: Web driver
-    :param left:   Left coordinate of the combobox
-    :param top:    Top coordinate of the combobox
-    :param height: Height of the combobox
-    :return:       List of texts of values that could be selected from the combobox
-    """
-    add_scripts_if_need(driver)
-    
-    script =  '__tra_extractComboValues({},{},{})'.format(left, top, height)
-    return execute_async(driver, script)
-
-
-def select_combobox_value(driver, left, top, height, value_text):
-    """
-    Selects combobox value
-    :param driver:     Web driver
-    :param left:       Left coordinate of the combobox
-    :param top:        Right coordinate of the combobox
-    :param height:     Height of the combobox
-    :param value_text: Text of value to select
-    :return:           Weather select is success or not
-    """
-    return execute_async(driver, "__tra_selectComboboxValue({},{},{},'{}')".format(left, top, height, value_text))

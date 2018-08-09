@@ -26,7 +26,7 @@ def check_text(text, contains, not_contains=None, normalize=True):
             has_searched = True
             break
 
-    if not has_searched:
+    if not has_searched and len(contains) > 0:
         return False
 
     has_forbidden = False

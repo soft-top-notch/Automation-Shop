@@ -1,5 +1,5 @@
-from abc import ABCMeta, abstractmethod
-from selenium_helper import *
+from abc import abstractmethod
+from selenium_utils.common import *
 from collections import namedtuple
 import uuid
 import os.path

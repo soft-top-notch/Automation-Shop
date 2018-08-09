@@ -1,5 +1,6 @@
 from shop_tracer import *
-from selenium_helper import *
+from selenium_utils.common import *
+from selenium_utils.controls import *
 from common_heuristics import *
 
 import nlp
