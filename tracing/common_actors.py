@@ -139,7 +139,7 @@ class ToCheckout(IStepActor):
     @staticmethod
     def find_checkout_elements(driver):
         contains =  ["checkout", "check out"]
-        not_contains = ['continue shopping', 'return']
+        not_contains = ['continue shopping', 'return', 'guideline']
         btns = find_buttons_or_links(driver, contains, not_contains)
 
         # if there are buttongs that contains words in text return them first
@@ -204,7 +204,7 @@ class PaymentFields(IStepActor):
             if text_element:
                 pass_button = []
 
-                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "go", "create.*.account", "new.*.customer"], ["login"]):
+                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "create.*.account", "new.*.customer"], ["login"]):
                     if button.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     pass_button.append(button)
@@ -551,16 +551,10 @@ class PaymentFields(IStepActor):
                 print("Billing information is already inputed or something wrong!")
                 is_userinfo = False
 
-            if not is_paymentinfo:
-                if self.fill_payment_info(driver, context):
-                    is_paymentinfo = True
-                else:
-                    if self.check_iframe_and_fill(driver, context):
-                        is_paymentinfo = True
             order = find_buttons(
                 driver,
                 ["order", "pay", "checkout", "payment", "create*.*account"],
-                ["add", "modify", "coupon", "express", "continu", "border", "proceed", "review"]
+                ["add", "modify", "coupon", "express", "continu", "border", "proceed", "review", "standard", "free"]
             )
 
             agree_btns = find_radio_or_checkbox_buttons(
@@ -583,6 +577,13 @@ class PaymentFields(IStepActor):
             if div_btns:
                 div_btns[0].click()
                 time.sleep(1)
+
+            if not is_paymentinfo:
+                if self.fill_payment_info(driver, context):
+                    is_paymentinfo = True
+                else:
+                    if self.check_iframe_and_fill(driver, context):
+                        is_paymentinfo = True
 
             if order:
                 break
@@ -666,15 +667,27 @@ class PaymentFields(IStepActor):
 
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
-        time.sleep(4)
+        time.sleep(3)
         auth_pass = self.find_auth_pass_buttons(driver)
         if auth_pass:
+            #Fill email field if exist...
+            guest_email = []
+
+            for email in driver.find_elements_by_css_selector("input[type='email']"):
+                if can_click(email):
+                    guest_email.append(email)
+
+            if guest_email:
+                for g_email in guest_email:
+                    g_email.send_keys(context.user_info.email)
+            import pdb;
+            pdb.set_trace()
             #create an account as guest....
             if not click_first(driver, auth_pass):
                 return state
             time.sleep(2)
             account_btn = []
-            for button in find_buttons_or_links(driver, ["continue"]):
+            for button in find_buttons_or_links(driver, ["continue"], ["continue shopping", "return"]):
                 if (button.get_attribute('href') == normalize_url(get_url(driver))) or \
                     (nlp.check_text(button.get_attribute("outerHTML"), ["login", "sign"])):
                     continue
