@@ -8,6 +8,7 @@ import sys
 import traceback
 import time
 import calendar
+import csv
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -204,7 +205,7 @@ class PaymentFields(IStepActor):
             if text_element:
                 pass_button = []
 
-                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "create.*.account", "new.*.customer"], ["login"]):
+                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "new.*.customer"], ["login"]):
                     if button.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     pass_button.append(button)
@@ -402,8 +403,8 @@ class PaymentFields(IStepActor):
         select_contains = ["country", "state", "zone"]
         not_extra_contains = ["email", "address2", "firstname", "lastname", "street"]
         extra_contains = [
-            ["fname,namefirst,username", "firstname"],
-            ["lname,namelast", "lastname"],
+            ["fname,namefirst,username,first_name", "firstname"],
+            ["lname,namelast,last_name", "lastname"],
             ["comp", "company"],
             ["address", "street"], # First item is a sub-string to check in text, Second item is a string to add in text
             ["post", "zip"]
@@ -551,15 +552,20 @@ class PaymentFields(IStepActor):
                 print("Billing information is already inputed or something wrong!")
                 is_userinfo = False
 
-            order = find_buttons(
-                driver,
-                ["order", "pay", "checkout", "payment", "create*.*account"],
-                ["add", "modify", "coupon", "express", "continu", "border", "proceed", "review", "standard", "free"]
-            )
+            order = []
+
+            for button in find_buttons(
+                            driver,
+                            ["order", "pay", "checkout", "payment", "create*.*account", "buy"],
+                            ["add", "modify", "coupon", "express", "continu", "border", "proceed", "review"]
+                        ):
+                if button.get_attribute("href") == get_url(driver):
+                    continue
+                order.append(button)
 
             agree_btns = find_radio_or_checkbox_buttons(
                 driver,
-                ["agree", "terms", "paypal", "same", "copy", "remember", "keep", "credit"],
+                ["agree", "terms", "paypal", "same", "copy", "remember", "keep", "credit", "stripe", "mr", "standard", "free", "billing_to_show"],
                 ["express"]
             )
 
@@ -589,7 +595,7 @@ class PaymentFields(IStepActor):
                 break
 
             continue_btns = []
-            for btn in find_buttons_or_links(driver, ["continu", "next", "proceed"], ["login", "cancel"]):
+            for btn in find_buttons_or_links(driver, ["continu", "next", "proceed", "submitc"], ["login", "cancel"]):
                 if btn.get_attribute('href') == normalize_url(get_url(driver)):
                     continue
                 continue_btns.append(btn)
@@ -660,6 +666,7 @@ class PaymentFields(IStepActor):
                     break
 
         return_flag = self.check_error(driver, context)
+
         if return_flag:
             logging.debug("Successed!")
 
@@ -680,8 +687,7 @@ class PaymentFields(IStepActor):
             if guest_email:
                 for g_email in guest_email:
                     g_email.send_keys(context.user_info.email)
-            import pdb;
-            pdb.set_trace()
+
             #create an account as guest....
             if not click_first(driver, auth_pass):
                 return state
