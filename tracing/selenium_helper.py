@@ -6,6 +6,7 @@ import traceback
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of
+from selenium.common.exceptions import UnexpectedAlertPresentException
 
 import tempfile
 import os
@@ -21,15 +22,29 @@ class Frame:
     def __enter__(self):
         if self.frame:
             self.driver.switch_to.frame(self.frame)
-            self.url = self.driver.current_url
+            self.url = get_url(self.driver)
 
     def __exit__(self, type, value, traceback):
         if self.frame:
-            url = self.driver.current_url
+            url = get_url(self.driver)
             
             # ToDo Do checks without ancors
             if url == self.url and not is_stale(self.frame):
                 self.driver.switch_to.default_content()
+
+                
+def get_url(driver, attempts = 2):
+    try:
+        return driver.current_url
+    except UnexpectedAlertPresentException:
+        if attempts > 1:
+            close_alert_if_appeared(driver)
+            return get_url(driver, attempts - 1)
+        else:
+            return None
+    except:
+        return None
+    
 
 
 def is_stale(elem):
@@ -118,6 +133,65 @@ def get_element_attribute(element):
         return ['value', element.get_attribute('value')]
 
     return None
+
+
+def get_name_of_state(state):
+    us_state_abbrev = {
+        'AL': 'Alabama',
+        'AK': 'Alaska',
+        'AZ': 'Arizona',
+        'AR': 'Arkansas',
+        'CA': 'California',
+        'CO': 'Colorado',
+        'CT': 'Connecticut',
+        'DE': 'Delaware',
+        'FL': 'Florida',
+        'GA': 'Georgia',
+        'HI': 'Hawaii',
+        'ID': 'Idaho',
+        'IL': 'Illinois',
+        'IN': 'Indiana',
+        'IA': 'Iowa',
+        'KS': 'Kansas',
+        'KY': 'Kentucky',
+        'LA': 'Louisiana',
+        'ME': 'Maine',
+        'MD': 'Maryland',
+        'MA': 'Massachusetts',
+        'MI': 'Michigan',
+        'MN': 'Minnesota',
+        'MS': 'Mississippi',
+        'MO': 'Missouri',
+        'MT': 'Montana',
+        'NE': 'Nebraska',
+        'NV': 'Nevada',
+        'NH': 'New Hampshire',
+        'NJ': 'New Jersey',
+        'NM': 'New Mexico',
+        'NY': 'New York',
+        'NC': 'North Carolina',
+        'ND': 'North Dakota',
+        'OH': 'Ohio',
+        'OK': 'Oklahoma',
+        'OR': 'Oregon',
+        'PA': 'Pennsylvania',
+        'RI': 'Rhode Island',
+        'SC': 'South Carolina',
+        'SD': 'South Dakota',
+        'TN': 'Tennessee',
+        'TX': 'Texas',
+        'UT': 'Utah',
+        'VT': 'Vermont',
+        'VA': 'Virginia',
+        'WA': 'Washington',
+        'WV': 'West Virginia',
+        'WI': 'Wisconsin',
+        'WY': 'Wyoming',
+    }
+
+    if state == 'DC':
+        state = 'DE'
+    return us_state_abbrev[state]
 
 
 def create_chrome_driver(chrome_path='/usr/bin/chromedriver', headless=True, size = None):

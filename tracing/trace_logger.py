@@ -39,7 +39,7 @@ class ITraceLogging:
         raise NotImplementedError
 
     def save_snapshot(self, driver, state, handler, additional = None):
-        url = driver.current_url
+        url = get_url(driver)
         html = driver.page_source
         screenshot = get_screenshot(driver)
 

@@ -19,7 +19,7 @@ class States:
     payment_page = "payment_page"
     purchased = "purchased"
 
-    states = [new, shop, product_page, product_in_cart, checkout_page, payment_page, purchased]
+    states = [new, shop, product_page, product_in_cart, cart_page, checkout_page, payment_page, purchased]
 
 
 class TraceContext:
@@ -42,16 +42,16 @@ class TraceContext:
         assert not self.is_started, "Can't call on_started when is_started = True"
         self.is_started = True
         self.state = States.new
-        self.url = self.driver.current_url
+        self.url = get_url(self.driver)
     
         if self.trace_logger:
             self.trace = self.trace_logger.start_new(self.domain)
             self.log_step(None, 'started')
     
     def on_handler_finished(self, state, handler):
-        if self.state != state or self.url != self.driver.current_url:
+        if self.state != state or self.url != get_url(self.driver):
             self.state = state
-            self.url = self.driver.current_url
+            self.url = get_url(self.driver)
             self.log_step(str(handler))
     
     def on_finished(self, status):
@@ -106,7 +106,7 @@ class IStepActor:
 class ShopTracer:
     def __init__(self,
                  get_user_data,
-                 chrome_path='/usr/local/chromedriver',
+                 chrome_path='/usr/bin/chromedriver',
                  headless=False,
                  # Must be an instance of ITraceSaver
                  trace_logger = None
@@ -160,7 +160,7 @@ class ShopTracer:
             
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
-  
+
     def get_driver(self, timeout=60):
         if self._driver:
             self._driver.quit()
@@ -175,7 +175,7 @@ class ShopTracer:
     def process_state(self, driver, state, context):
         # Close popups if appeared
         close_alert_if_appeared(self._driver)
-            
+
         handlers = [(priority, handler) for priority, handler in self._handlers
                     if handler.can_handle(driver, state, context)]
 
@@ -203,7 +203,7 @@ class ShopTracer:
                     self._logger.info('handler {}'.format(handler))
                     new_state = handler.act(driver, state, context)
                     close_alert_if_appeared(self._driver)
-                    self._logger.info('new_state {}, url {}'.format(new_state, driver.current_url))
+                    self._logger.info('new_state {}, url {}'.format(new_state, get_url(driver)))
 
                     assert new_state is not None, "new_state is None"
 
@@ -268,12 +268,13 @@ class ShopTracer:
                 return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
+
             while state != States.purchased:
                 new_state = self.process_state(driver, state, context)
 
                 if state == new_state:
                     break
-                    
+
                 state = new_state
                 
         except:

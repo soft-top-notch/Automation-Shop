@@ -1,3 +1,4 @@
 wrapt
 requests
 lxml
+image
