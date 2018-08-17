@@ -29,12 +29,6 @@ def find_elements_with_attribute(driver,
     return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
 
-def normalize_url(url):
-    if not url:
-        return url
-    
-    return url[:url.index('#')] if '#' in url else url
-
 
 def is_link(driver, elem):
     current_url = normalize_url(get_url(driver))
