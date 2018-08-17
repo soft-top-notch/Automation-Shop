@@ -4,6 +4,7 @@ import logging
 
 from shop_tracer import *
 from selenium_helper import *
+from trace_logger import *
 import common_actors
 import user_data
 
@@ -17,32 +18,27 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
         url = row[0]
         if url:
             all_urls.append(url)
-
 # Random sample urls
 random.seed(4)
 sample_urls = random.sample(all_urls, 500)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'docssmokeshop.com',
-    'vapininthecape.com',
-    'jonessurgical.com',
-    'vaporsupply.com',
-    'firstfitness.com',
-    'srandd.com',
-    'theglamourshop.com',
-    'sandlakedermatology.com',
-    'docssmokeshop.com',
-    'dixieems.com',
-    'srandd.com',
-    'ambarygardens.com',
-    'anabolicwarfare.com'
+    'naturesbestrelief.com',
+    'purekindbotanicals.com',
+    'ossur.com',
+    'freshfarmscbd.com',
+    'naturesbestrelief.com',
+    'www.poundsandinchesaway.com',
+    'bluespringsanimalhospital.com',
+    'mikestvbox.com',
 ]
 
+trace_logger = FileTraceLogger("images", "checkout_page_filling")
 
 @contextmanager
 def get_tracer(headless=False):
-    tracer = ShopTracer(user_data.get_user_data, headless=headless)
+    tracer = ShopTracer(user_data.get_user_data, headless=headless, trace_logger=trace_logger)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
@@ -67,7 +63,6 @@ with open('../resources/url_states.csv') as f:
         url, status = row
         if status == "checkout_page" or status == "purchased":
             urls_to_test.append(url)
-
 
 results = []
 with get_tracer(headless=False) as tracer:

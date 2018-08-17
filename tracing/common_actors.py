@@ -198,7 +198,7 @@ class PaymentFields(IStepActor):
         if text_element:
             pass_button = []
 
-            for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "new.*.customer"], ["login", "continue shopping", "return", "signin"]):
+            for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "new.*.customer"], ["login", "continue shopping", "cart", "logo", "return", "signin"]):
                 if button.get_attribute('href') == normalize_url(get_url(driver)):
                     continue
                 pass_button.append(button)
@@ -316,15 +316,20 @@ class PaymentFields(IStepActor):
                     flag = False
                     for option in sel.find_elements_by_css_selector("option"):
                         text = option.text + " " + option.get_attribute("innerHTML").strip()
-                        if nlp.check_text(text, [
+                        ctns  = []
+
+                        if item == "country":
+                            ctns = ["united states"]
+                        else:
+                            ctns = [
                                 nlp.normalize_text(get_name_of_state(context.user_info.state)),
-                                "united states",
                                 nlp.normalize_text(context.payment_info.card_type),
                                 "(\d\d|^){}$".format(context.payment_info.expire_date_year),
                                 "(^|-|_|\s|\d){}".format(nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)])),
                                 context.payment_info.expire_date_month,
                                 "^{}$".format(nlp.normalize_text(context.user_info.state))
-                            ]):
+                            ]
+                        if nlp.check_text(text, ctns):
                             try:
                                 time.sleep(2)
                                 option.click() # select() in earlier versions of webdriver
@@ -405,6 +410,7 @@ class PaymentFields(IStepActor):
             if (inputed_fields_cnt + selected_count) < (len(json_Info.keys()) - 4):
                 success_flag = False
         time.sleep(1)
+
         return success_flag
 
     def fill_billing_address(self, driver, context):
@@ -582,7 +588,8 @@ class PaymentFields(IStepActor):
             if not self.fill_billing_address(driver, context):
                 print("Billing information is already inputed or something wrong!")
                 is_userinfo = False
-
+            else:
+                context.log_step("Fill user information fields")
             order = []
 
             for button in find_buttons(
@@ -603,9 +610,11 @@ class PaymentFields(IStepActor):
             if not is_paymentinfo:
                 if self.fill_payment_info(driver, context):
                     is_paymentinfo = True
+                    context.log_step("Fill payment info fields")
                 else:
                     if self.check_iframe_and_fill(driver, context):
                         is_paymentinfo = True
+                        context.log_step("Fill payment info fields")
 
             if order:
                 break
@@ -671,6 +680,7 @@ class PaymentFields(IStepActor):
                         logging.debug("Payment information is already inputed or payment field not exist!")
                     else:
                         is_paymentinfo = True
+                        context.log_step("Fill payment info fields")
                     if not self.click_one_element(pay_button):
                         logging.debug("Pay or order button error!")
                     else:
@@ -713,7 +723,9 @@ class PaymentFields(IStepActor):
                 for g_email in guest_email:
                     g_email.send_keys(context.user_info.email)
 
+            time.sleep(1)
             #click continue button for guest....
+
             if not click_first(driver, continue_pass):
                 return state
             time.sleep(1)
