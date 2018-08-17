@@ -5,6 +5,7 @@ import uuid
 import os.path
 import os
 import json
+import tempfile
 
 
 class TraceEncoder(json.JSONEncoder):
@@ -34,16 +35,27 @@ class ITraceLogging:
     """
     Object that logs current trace
     """
+    
     @abstractmethod
-    def add_step(self, url, state, handler, screenshot, source, additional = None):
+    def create_img_file(self):
+        return tempfile.mkstemp(suffix = '.png')[1]
+    
+    @abstractmethod
+    def add_step(self, url, state, handler, screenshot_file, source, additional = None):
         raise NotImplementedError
 
     def save_snapshot(self, driver, state, handler, additional = None):
+        
+        if not hasattr(self, '_scale') or not self._scale:
+            self._scale = get_scale(driver)
+            
         url = get_url(driver)
         html = driver.page_source
-        screenshot = get_screenshot(driver)
+        
+        screenshot_file = self.create_img_file()
+        get_full_page_screenshot(driver, screenshot_file, self._scale, 10)
 
-        self.add_step(url, state, handler, screenshot, html, additional)
+        self.add_step(url, state, handler, screenshot_file, html, additional)
 
         
 class ITraceLogger:
@@ -103,11 +115,10 @@ class FileTraceLogging(ITraceLogging):
         self.status = None
         self._img_folder = img_folder
     
-    def add_step(self, url, state, handler, screenshot, source, additional = None):
+    def add_step(self, url, state, handler, screenshot_file, source, additional = None):
         file_name = str(uuid.uuid4()) + '.png'
         file_path = os.path.join(self._img_folder, file_name)
-        with open(file_path, "wb") as file:
-            file.write(screenshot)
+        os.rename(screenshot_file, file_path)
 
         step = Step(url, state, handler, file_path, source, additional)
         self.steps.append(step)

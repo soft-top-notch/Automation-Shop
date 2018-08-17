@@ -22,17 +22,32 @@ class Frame:
     def __enter__(self):
         if self.frame:
             self.driver.switch_to.frame(self.frame)
-            self.url = get_url(self.driver)
+            self.url = normalize_url(get_url(self.driver))
+        
+        self.driver.active_frame = self
 
-    def __exit__(self, type, value, traceback):
+    def is_need_to_exit(self):
         if self.frame:
-            url = get_url(self.driver)
+            url = normalize_url(get_url(self.driver))
             
-            # ToDo Do checks without ancors
-            if url == self.url and not is_stale(self.frame):
-                self.driver.switch_to.default_content()
+            return url == self.url and not is_stale(self.frame)
+         
+        return False
+    
+    def __exit__(self, type, value, traceback):
+        if self.is_need_to_exit():
+            self.driver.switch_to.default_content()
+        
+        self.driver.active_frame = None
 
-                
+
+def normalize_url(url):
+    if not url:
+        return url
+    
+    return url[:url.index('#')] if '#' in url else url
+
+
 def get_url(driver, attempts = 2):
     try:
         return driver.current_url
@@ -305,8 +320,7 @@ def get_scale(driver):
     :param driver:   Web driver
     :return:         Screenshot width / page width
     """
-    fd, path = tempfile.mkstemp(prefix='screenshot', suffix='.png')
-    os.close(fd)
+    _, path = tempfile.mkstemp(prefix='screenshot', suffix='.png')
     
     driver.save_screenshot(path)
     w, h = Image.open(path).size
@@ -340,14 +354,18 @@ def enter_text(driver, x, y, text):
     driver.execute_script('el = document.elementFromPoint({}, {}); el.value = "{}";'.format(x, y, text))
 
 
-def get_full_page_screenshot(driver, output_file, scale):
+def get_full_page_screenshot(driver, output_file, scale, max_pages = 10):
     """
     Takes correct screenshot with scrolls and dynamic content
     :param driver:       Web driver
     :param output_file:  File to save screenshot
     :param scale:        Screenshot width / page width
                          Should be calculated using method get_scale(driver)
+    :param max_pages:    Maximum pages to scroll (could be usefull for the infinite page). 
+                         If max_pages < 0 then scrolls till the end or infinite time.
+                         
     """
+       
     screens = []
         
     def save_screenshot():        
@@ -359,12 +377,18 @@ def get_full_page_screenshot(driver, output_file, scale):
         return path
     
     try:
+        if hasattr(driver, 'active_frame') and driver.active_frame and driver.active_frame.is_need_to_exit():
+            driver.switch_to_default_content()
+            
+        # Scroll to the top of the page
+        driver.execute_script("document.body.scrollTop = document.documentElement.scrollTop = 0;")
+
         # take screenshots
         height = get_window_height(driver)
         scrolled = height
         save_screenshot()
         
-        while scrolled < get_page_height(driver):
+        while scrolled < get_page_height(driver) and (max_pages < 0 or len(screens) < max_pages):
             scroll(driver, 0, height)
             time.sleep(0.1)
             save_screenshot()
@@ -374,35 +398,41 @@ def get_full_page_screenshot(driver, output_file, scale):
         # stitch images together
         stiched = None
         
+        y = 0
         for i, screen in enumerate(screens):
             img = Image.open(screen)
              
             w, h = img.size
-            y = i * height * scale
-             
             if i == len(screens) - 1:
-                w = w * scale
-                h = h * scale  
                 img = img.crop((0, h-(round(scale * scrolled)) % h, w, h))
                 w, h = img.size
             
+            if h == 0 or w == 0:
+                continue
+                
             if stiched is None:
                 stiched = Image.new('RGB', (w, round(scrolled * scale)))
-             
+            
             stiched.paste(img, (
                 0, # x0
-                round(y), # y0
+                y, # y0
                 w, # x1
-                round(y + h) # y1
+                y + h # y1
             ))
-            
-        stiched.save(output_file)
+            y = y + h
+        
+        if stiched:
+            stiched.save(output_file)
         
     finally:
         # cleanup
         for screen in screens:
             if os.path.isfile(screen):
                 os.remove(screen)
+        
+        if hasattr(driver, 'active_frame') and driver.active_frame and driver.active_frame.is_need_to_exit():
+            driver.switch_to.frame(driver.active_frame.frame)
+        
  
     return output_file
 
