@@ -25,7 +25,6 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
         url = row[0]
         if url:
             all_urls.append(url)
-
 # Random sample urls
 random.seed(4)
 
@@ -36,19 +35,14 @@ sample_urls = random.sample(all_urls, num_urls)
 
 # Some good urls to analyze by hands
 good_urls = [
-    'docssmokeshop.com',
-    'vapininthecape.com',
-    'jonessurgical.com',
-    'vaporsupply.com',
-    'firstfitness.com',
-    'srandd.com',
-    'theglamourshop.com',
-    'sandlakedermatology.com',
-    'docssmokeshop.com',
-    'dixieems.com',
-    'srandd.com',
-    'ambarygardens.com',
-    'anabolicwarfare.com'
+    'naturesbestrelief.com',
+    'purekindbotanicals.com',
+    'ossur.com',
+    'freshfarmscbd.com',
+    'naturesbestrelief.com',
+    'www.poundsandinchesaway.com',
+    'bluespringsanimalhospital.com',
+    'mikestvbox.com',
 ]
 
 

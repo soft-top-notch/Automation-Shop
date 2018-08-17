@@ -193,28 +193,32 @@ class PaymentFields(IStepActor):
 
         return pwd_inputs
 
-    def find_auth_pass_buttons(self, driver):
+    def find_guess_continue_button(self, driver):
+        text_element = find_text_element(driver, ["guest", "(no|without|free|create).*account", "account.*.(no|without|free)"])
+        if text_element:
+            pass_button = []
+
+            for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "new.*.customer"], ["login", "continue shopping", "cart", "logo", "return", "signin"]):
+                if button.get_attribute('href') == normalize_url(get_url(driver)):
+                    continue
+                pass_button.append(button)
+
+            return pass_button
+        return None
+
+    def find_radio_continue_buttons(self, driver):
         radio_checkbox_btns = find_radio_or_checkbox_buttons(
             driver,
             ["guest", "create*.*later", "copy*.*ship", "copy*.*bill", "skip*.*login", "register"]
         )
+
         if radio_checkbox_btns:
             return radio_checkbox_btns
-        else:
-            text_element = find_text_element(driver, ["guest", "(no|without|free|create).*account", "account.*.(no|without|free)"])
-            if text_element:
-                pass_button = []
 
-                for button in find_buttons_or_links(driver, ["continue", "checkout", "check out", "(\s|^)go(\s|$)", "new.*.customer"], ["login"]):
-                    if button.get_attribute('href') == normalize_url(get_url(driver)):
-                        continue
-                    pass_button.append(button)
-
-                return pass_button
         return None
 
     def new_account_field_exist(self, driver, create_new_field):
-        text_element = find_text_element(driver, ["(no|without|free|create).*account", "guest", "account.*.(no|without|free)"], ["login","signin"])
+        text_element = find_text_element(driver, ["guest", "(no|without|free|create).*account", "account.*.(no|without|free)"], ["login","signin","sign in"])
 
         if not text_element:
             return False
@@ -237,7 +241,7 @@ class PaymentFields(IStepActor):
             if len(password_fields) >= 2:
                 return True
             if password_fields[0].is_displayed():
-                if not self.find_auth_pass_buttons(driver):
+                if not self.find_radio_continue_buttons(driver) and not self.find_guess_continue_button(driver):
                     if not self.new_account_field_exist(driver, password_fields[0]):
                         logger.debug("We can't use this url! Login password required!")
                         return False
@@ -285,7 +289,10 @@ class PaymentFields(IStepActor):
                 pass_once = True
 
         for sel in selects:
-            label_text = self.get_label_text_with_attribute(driver, sel)
+            try:
+                label_text = self.get_label_text_with_attribute(driver, sel)
+            except:
+                continue
             not_contains = []
             if content == "state":
                 not_contains = ["unitedstate"]
@@ -296,42 +303,46 @@ class PaymentFields(IStepActor):
                     pass_once = False
                     continue
                 selected_sels.append(sel)
-        if len(selected_sels) == 1:
-            result = selected_sels[0]
-        elif len(selected_sels) > 1:
-            result = None
-            for sel in selected_sels:
-                if not sel.is_displayed():
-                    continue
-                result = sel
-                break
-        return result
+        return selected_sels
 
     def process_select_option(self, driver, contains, context):
         result_cnt = 0
         for item in contains:
-            sel = self.find_select_element(driver, item, ['ex1', 'ex'])
-            if not sel:
+            selects = self.find_select_element(driver, item, ['ex1', 'ex'])
+            if not selects:
                 continue
-            for option in sel.find_elements_by_css_selector("option"):
-                text = option.text + " " + option.get_attribute("innerHTML").strip()
-                if nlp.check_text(text, [
-                        nlp.normalize_text(get_name_of_state(context.user_info.state)),
-                        "united states",
-                        nlp.normalize_text(context.payment_info.card_type),
-                        "(\d\d|^){}$".format(context.payment_info.expire_date_year),
-                        nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)]),
-                        context.payment_info.expire_date_month,
-                        "^{}$".format(nlp.normalize_text(context.user_info.state))
-                    ]):
-                    try:
-                        time.sleep(2)
-                        option.click() # select() in earlier versions of webdriver
-                        time.sleep(2)
-                        result_cnt += 1
+            for sel in selects:
+                try:
+                    flag = False
+                    for option in sel.find_elements_by_css_selector("option"):
+                        text = option.text + " " + option.get_attribute("innerHTML").strip()
+                        ctns  = []
+
+                        if item == "country":
+                            ctns = ["united states"]
+                        else:
+                            ctns = [
+                                nlp.normalize_text(get_name_of_state(context.user_info.state)),
+                                nlp.normalize_text(context.payment_info.card_type),
+                                "(\d\d|^){}$".format(context.payment_info.expire_date_year),
+                                "(^|-|_|\s|\d){}".format(nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)])),
+                                context.payment_info.expire_date_month,
+                                "^{}$".format(nlp.normalize_text(context.user_info.state))
+                            ]
+                        if nlp.check_text(text, ctns):
+                            try:
+                                time.sleep(2)
+                                option.click() # select() in earlier versions of webdriver
+                                time.sleep(2)
+                                result_cnt += 1
+                                flag = True
+                                break
+                            except:
+                                break
+                    if flag:
                         break
-                    except:
-                        return False
+                except:
+                    continue
         return result_cnt
 
     def input_fields_in_checkout(self,
@@ -382,14 +393,16 @@ class PaymentFields(IStepActor):
                         try:
                             elem.click()
                             elem.clear()
-                            if key == "phone":
-                                elem.send_keys(nlp.remove_letters(json_Info[key], ["(", ")", "-"]))
-                            else:
-                                elem.send_keys(json_Info[key])
-                            success_flag = True
-                            inputed_fields_cnt += 1
                         except:
+                            driver.execute_script("arguments[0].click();",elem)
                             pass
+                        if key == "phone":
+                            elem.send_keys(nlp.remove_letters(json_Info[key], ["(", ")", "-"]))
+                        else:
+                            elem.send_keys(json_Info[key])
+                        time.sleep(1)
+                        success_flag = True
+                        inputed_fields_cnt += 1
                         break
             except:
                 continue
@@ -397,6 +410,7 @@ class PaymentFields(IStepActor):
             if (inputed_fields_cnt + selected_count) < (len(json_Info.keys()) - 4):
                 success_flag = False
         time.sleep(1)
+
         return success_flag
 
     def fill_billing_address(self, driver, context):
@@ -433,12 +447,12 @@ class PaymentFields(IStepActor):
             ["mm(|\w+)yy,(\w\w|\d\d)/(\w\w|\d\d)", "expdate"],
             ["c\w+(num|num\w+)", "number"],
             ["exp", "expdate"],
-            ["verif.*,sec.*,cv,ccc,cc\wc,csc,card code", "cvc"]
+            ["verif.*,sec.*,cv,cc(\w|)c,csc,card(\w+|\s|)code", "cvc"]
         ]
         not_contains = [
             "first", "last", "phone", "company",
             "fname", "lname", "user", "email",
-            "address", "code", "street", "city", "post"
+            "address", "zip", "street", "city", "post"
         ]
 
         return self.input_fields_in_checkout(
@@ -548,10 +562,34 @@ class PaymentFields(IStepActor):
                 logger.debug("Error found in filling all fields")
                 return_flag = False
                 break
+
+            agree_btns = find_radio_or_checkbox_buttons(
+                driver,
+                ["agree", "terms", "paypal", "same", "copy", "different", "remember", "keep", "credit", "stripe", "mr", "standard", "free", "billing_to_show", "ground"],
+                ["express"]
+            )
+
+            if agree_btns:
+                for elem in agree_btns:
+                    if nlp.check_text(elem.get_attribute("outerHTML"), ["differ"]):
+                        if elem.is_displayed() and elem.is_selected():
+                            elem.send_keys(selenium.webdriver.common.keys.Keys.SPACE)
+                            time.sleep(0.5)
+                        else:
+                            continue
+                    else:
+                        if elem.is_displayed() and not elem.is_selected():
+                            try:
+                                elem.send_keys(selenium.webdriver.common.keys.Keys.SPACE)
+                                time.sleep(0.5)
+                            except ElementNotVisibleException:
+                                pass
+
             if not self.fill_billing_address(driver, context):
                 print("Billing information is already inputed or something wrong!")
                 is_userinfo = False
-
+            else:
+                context.log_step("Fill user information fields")
             order = []
 
             for button in find_buttons(
@@ -563,21 +601,6 @@ class PaymentFields(IStepActor):
                     continue
                 order.append(button)
 
-            agree_btns = find_radio_or_checkbox_buttons(
-                driver,
-                ["agree", "terms", "paypal", "same", "copy", "remember", "keep", "credit", "stripe", "mr", "standard", "free", "billing_to_show"],
-                ["express"]
-            )
-
-            if agree_btns:
-                for elem in agree_btns:
-                    if elem.is_displayed() and not elem.is_selected():
-                        try:
-                            elem.send_keys(selenium.webdriver.common.keys.Keys.SPACE)
-                            time.sleep(0.5)
-                        except ElementNotVisibleException:
-                            pass
-
             div_btns = find_elements_with_attribute(driver, "div", "class", "shipping_method")
 
             if div_btns:
@@ -587,15 +610,17 @@ class PaymentFields(IStepActor):
             if not is_paymentinfo:
                 if self.fill_payment_info(driver, context):
                     is_paymentinfo = True
+                    context.log_step("Fill payment info fields")
                 else:
                     if self.check_iframe_and_fill(driver, context):
                         is_paymentinfo = True
+                        context.log_step("Fill payment info fields")
 
             if order:
                 break
 
             continue_btns = []
-            for btn in find_buttons_or_links(driver, ["continu", "next", "proceed", "submitc"], ["login", "cancel"]):
+            for btn in find_buttons_or_links(driver, ["continu", "next", "proceed", "submit"], ["login", "cancel"]):
                 if btn.get_attribute('href') == normalize_url(get_url(driver)):
                     continue
                 continue_btns.append(btn)
@@ -655,6 +680,7 @@ class PaymentFields(IStepActor):
                         logging.debug("Payment information is already inputed or payment field not exist!")
                     else:
                         is_paymentinfo = True
+                        context.log_step("Fill payment info fields")
                     if not self.click_one_element(pay_button):
                         logging.debug("Pay or order button error!")
                     else:
@@ -675,8 +701,17 @@ class PaymentFields(IStepActor):
     def process_page(self, driver, state, context):
         #the case if authentication is requiring, pass authentication by creating an account as guest...
         time.sleep(3)
-        auth_pass = self.find_auth_pass_buttons(driver)
-        if auth_pass:
+        radio_pass = self.find_radio_continue_buttons(driver)
+
+        if radio_pass:
+            #click an radio as guest....
+            if not click_first(driver, radio_pass):
+                return state
+            time.sleep(1)
+
+        continue_pass = self.find_guess_continue_button(driver)
+
+        if continue_pass:
             #Fill email field if exist...
             guest_email = []
 
@@ -688,19 +723,13 @@ class PaymentFields(IStepActor):
                 for g_email in guest_email:
                     g_email.send_keys(context.user_info.email)
 
-            #create an account as guest....
-            if not click_first(driver, auth_pass):
+            time.sleep(1)
+            #click continue button for guest....
+
+            if not click_first(driver, continue_pass):
                 return state
-            time.sleep(2)
-            account_btn = []
-            for button in find_buttons_or_links(driver, ["continue"], ["continue shopping", "return"]):
-                if (button.get_attribute('href') == normalize_url(get_url(driver))) or \
-                    (nlp.check_text(button.get_attribute("outerHTML"), ["login", "sign"])):
-                    continue
-                account_btn.append(button)
-            if account_btn:
-                if click_first(driver, account_btn):
-                    time.sleep(2)
+            time.sleep(1)
+
 
         #the case if authentication is not requiring....
         filling_result = self.click_to_order(driver, context)
