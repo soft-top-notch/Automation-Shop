@@ -1,4 +1,7 @@
-wrapt
 requests
 lxml
 image
+Pillow
+mongoengine
+pika
+configparser
