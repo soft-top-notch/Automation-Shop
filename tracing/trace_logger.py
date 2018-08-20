@@ -126,3 +126,55 @@ class FileTraceLogging(ITraceLogging):
     def set_status(self, status):
         self.status = status
 
+
+
+from PIL import Image
+from mongoengine import *
+import datetime
+        
+class MongoDbTraceLogger(ITraceLogger):
+
+    @abstractmethod
+    def start_new(self, domain):
+        return MongoDbTrace(domain = domain, steps = [])
+
+    @abstractmethod
+    def save(self, trace, status):
+        trace.final_state = status.state
+        trace.status = str(status)
+        
+        trace.save()
+
+class MongoDbStep(EmbeddedDocument):
+    url = StringField()
+    state = StringField()
+    handler = StringField()
+    screenshot = FileField()
+    source = StringField()
+    additional = StringField()
+    
+    added = DateTimeField(default=datetime.datetime.utcnow)
+
+            
+class MongoDbTrace(Document, ITraceLogging):
+    domain = StringField(required=True)
+    started = DateTimeField(default=datetime.datetime.utcnow)
+    steps = ListField(EmbeddedDocumentField(MongoDbStep))
+    
+    final_state = StringField()
+    status = StringField()
+    
+    def add_step(self, url, state, handler, screenshot_file, source, additional = None):
+        step = MongoDbStep(url = url, 
+                           state = state, 
+                           handler = handler, 
+                           source = source, 
+                           additional = additional)
+        
+        with open(screenshot_file, 'rb') as image_file:
+            step.screenshot.put(image_file, content_type='image/png')
+        
+        self.steps.append(step)
+        os.remove(screenshot_file)
+
+
