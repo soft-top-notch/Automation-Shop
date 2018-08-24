@@ -2,3 +2,5 @@ wrapt
 requests
 lxml
 image
+selenium
+csv

@@ -7,6 +7,27 @@ import random
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
+def get_label_text_with_attribute(driver, elem):
+    label_text = ""
+    element_attribute = get_element_attribute(elem)
+
+    try:
+        if element_attribute:
+            if element_attribute[0] == "id":
+                label = driver.find_elements_by_css_selector("label[for='%s']" % element_attribute[1])
+                if label:
+                    label_text = nlp.remove_letters(label[0].get_attribute("innerHTML").strip(), ["/", "*", "-", "_", ":", " "]).lower()
+                    return label_text
+
+        label_text = nlp.remove_letters(
+                elem.get_attribute("outerHTML").strip(),
+                ["*", "-", "_", ":", " "]
+        ).lower()
+    except:
+        label_text = ""
+        pass
+
+    return label_text
 
 def find_radio_or_checkbox_buttons(driver,
                                   contains=None,
@@ -19,6 +40,11 @@ def find_radio_or_checkbox_buttons(driver,
         text = elem.get_attribute("outerHTML")
         if nlp.check_text(text, contains, not_contains):
             result.append(elem)
+        else:
+            l_text = get_label_text_with_attribute(driver, elem)
+
+            if l_text and nlp.check_text(l_text, contains, not_contains):
+                result.append(elem)
     
     return result
 

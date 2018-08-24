@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 # All urls
 all_urls = []
-with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
+with open('../resources/regression_urls.csv', 'r') as f:
     rows = csv.reader(f)
     for row in rows:
         url = row[0]
@@ -20,7 +20,7 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
             all_urls.append(url)
 # Random sample urls
 random.seed(4)
-sample_urls = random.sample(all_urls, 500)
+# sample_urls = random.sample(all_urls, 100)
 
 # Some good urls to analyze by hands
 good_urls = [
@@ -67,9 +67,9 @@ with open('../resources/url_states.csv') as f:
 results = []
 with get_tracer(headless=False) as tracer:
     with open('url_states.csv', 'w') as f:
-        for url in urls_to_test:
+        for url in all_urls:
             logger.info('\n\nstarted url: {}'.format(url))
-            status = tracer.trace(url, 60, attempts=3)
+            status = tracer.trace(url, 60, attempts=3, delaying_time=10)
             results.append(status)
             logger.info('finished url: {}, status: {}, state: {}'.format(url, status, status.state))
             
