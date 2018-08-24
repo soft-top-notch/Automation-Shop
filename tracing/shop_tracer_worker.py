@@ -25,7 +25,7 @@ class Worker(threading.Thread):
         
         self.connection = pika.BlockingConnection(params)
         self.channel = self.connection.channel()
-        self.channel.queue_declare(queue = rabbitmq_queue)
+        self.channel.queue_declare(queue = rabbitmq_queue, durable=True)
         self.channel.basic_qos(prefetch_count = 1)
         self.channel.basic_consume(self.process_task, queue = rabbitmq_queue)        
 
