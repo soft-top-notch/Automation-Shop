@@ -763,8 +763,16 @@ class PaymentFields(IStepActor):
                 return_flag = False
                 break
             elif checked_error == 1:
+                try:
+                    alert = driver.swtich_to.alert
+                    if nlp.check_text(alert.text, ["decline", "duplicate"]):
+                        return True
+                except:
+                    pass
                 purchase_text = get_page_text(driver)
-                if nlp.check_text(purchase_text, ["credit card to complete your purchase"]):
+                if nlp.check_text(purchase_text, ["being process"]):
+                    time.sleep(2)
+                elif nlp.check_text(purchase_text, ["credit card to complete your purchase", "secure payment page"]):
                     return True
             elif checked_error == 2:
                 return True
