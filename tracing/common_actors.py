@@ -612,11 +612,26 @@ class PaymentFields(IStepActor):
                         time.sleep(1)
                 index += 1
 
+    def check_alert_text(self, driver):
+        try:
+            alert = driver.switch_to.alert
+
+            if nlp.check_text(alert.text, ["decline", "duplicate", "merchant", "transaction"]):
+                alert.accept()
+                return True
+        except:
+            return False
+
     def check_error(self, driver, context):
         '''Check error elements after clicking order button'''
         logger = logging.getLogger('shop_tracer')
         error_result = []
-        error_elements = find_error_elements(driver, ["error", "err", "alert", "advice", "fail", "invalid"], ["override"])
+        try:
+            error_elements = find_error_elements(driver, ["error", "err", "alert", "advice", "fail", "invalid"], ["override"])
+        except:
+            if self.check_alert_text(driver):
+                return 2
+            return 0
         time.sleep(2)
 
         required_fields = driver.find_elements_by_css_selector("input")
@@ -763,12 +778,8 @@ class PaymentFields(IStepActor):
                 return_flag = False
                 break
             elif checked_error == 1:
-                try:
-                    alert = driver.swtich_to.alert
-                    if nlp.check_text(alert.text, ["decline", "duplicate"]):
-                        return True
-                except:
-                    pass
+                if self.check_alert_text(driver):
+                    return True
                 purchase_text = get_page_text(driver)
                 if nlp.check_text(purchase_text, ["being process"]):
                     time.sleep(2)
@@ -790,8 +801,14 @@ class PaymentFields(IStepActor):
         except:
             driver.execute_script("arguments[0].click();", order[0])
             pass
+
         time.sleep(context.delaying_time-2)
+
+        if self.check_alert_text(driver):
+            return True
+
         checked_error = self.check_error(driver, context)
+
         if not checked_error:
             return False
         elif checked_error == 2:
