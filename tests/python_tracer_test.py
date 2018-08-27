@@ -32,7 +32,6 @@ logger.addHandler(handler)
 
 # Regressioin urls for testing
 test_urls = []
-regression_status = []
 
 with open('./regression_urls.csv', 'r') as f:
     rows = csv.reader(f)
@@ -41,7 +40,6 @@ with open('./regression_urls.csv', 'r') as f:
         status = row[1]
         if url:
             test_urls.append(url)
-            regression_status.append(status)
 
 results = []
 with get_tracer(headless=False) as tracer:
@@ -49,11 +47,11 @@ with get_tracer(headless=False) as tracer:
         logger.info('\n\nstarted url: {}'.format(url))
         status = tracer.trace(url, 60, attempts=3, delaying_time=10)
 
-        if regression_status[index] == status.state:
+        if status.state == States.purchased:
             logger.info('\n\nfinished url: {}, status: {}, state: {}'.format(url, status, "-----Exactly purchased! Success!-----"))
         else:
             warnning_text = '\n\nfinished url: {}, status: {}, state: {}'.format(url, status, "-----Can't purchase! Failed!-----")
-            logger.warning(warnning_text)
+            logger.info(warnning_text)
             results.append(warnning_text)
 
 
