@@ -17,6 +17,10 @@ import time
 
 from contextlib import contextmanager
 
+num_threads = 8 # Number of threads to run
+num_urls = 100  # Number of urls to sample 
+delay = 5 # Seconds to sleep after every action in Selenium
+
 # All urls
 all_urls = []
 with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
@@ -25,12 +29,9 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
         url = row[0]
         if url:
             all_urls.append(url)
+
 # Random sample urls
 random.seed(4)
-
-num_threads = 8
-num_urls = 100
-
 sample_urls = random.sample(all_urls, num_urls)
 
 # Some good urls to analyze by hands
@@ -65,8 +66,6 @@ formatter = logging.Formatter(
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-queue = Queue()
-
 results = {}
 def save_result(url, status):
     with open('url_states.csv', 'a') as f:
@@ -82,7 +81,7 @@ class Processor:
         with get_tracer(False, self.processor_num) as tracer:
             while True:
                 url = queue.get()
-                status = tracer.trace(url, attempts=3)
+                status = tracer.trace(url, attempts=3, delaying_time=delay)
                 save_result(url, status)        
 
 os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'

@@ -32,6 +32,7 @@ class UserInfo:
         return {
             "first name": self.first_name,
             "last name": self.last_name,
+            "full name": self.first_name + " " + self.last_name,
             "country": self.country,
             "state": self.state,
             "home": self.home,
@@ -52,7 +53,8 @@ class PaymentInfo:
                  card_type,
                  expire_date_year,
                  expire_date_month,
-                 cvc
+                 cvc,
+                 zip
                  ):
         self.card_number = card_number
         self.card_name = card_name
@@ -60,14 +62,17 @@ class PaymentInfo:
         self.expire_date_year = expire_date_year
         self.expire_date_month = expire_date_month
         self.cvc = cvc
+        self.zip = zip
 
     def get_json_paymentinfo(self):
         return {
             "number": self.card_number,
             "name": self.card_name,
             "type": self.card_type,
-            "expdate": self.expire_date_month+ self.expire_date_year,
+            "expdate": self.expire_date_month + self.expire_date_year,
+            "birthdate": self.expire_date_month + "0119" + self.expire_date_year,
             "cvc": self.cvc,
+            "zip": self.zip
         }
 
 
@@ -103,7 +108,8 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
         data['CC provider:'],
         year,
         month,
-        data['CC CVV']
+        data['CC CVV'],
+        data['Zip code:']
     )
 
     return user_info, payment_info

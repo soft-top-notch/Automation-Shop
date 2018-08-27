@@ -23,7 +23,7 @@ class States:
 
 
 class TraceContext:
-    def __init__(self, domain, user_info, payment_info, tracer):
+    def __init__(self, domain, user_info, payment_info, delaying_time, tracer):
         self.user_info = user_info
         self.payment_info = payment_info
         self.domain = domain
@@ -32,6 +32,7 @@ class TraceContext:
         self.trace = None
         self.state = None
         self.url = None
+        self.delaying_time = delaying_time
         self.is_started = False
 
     @property
@@ -214,7 +215,7 @@ class ShopTracer:
 
         return state
 
-    def trace(self, domain, wait_response_seconds = 60, attempts = 3):
+    def trace(self, domain, wait_response_seconds = 60, attempts = 3, delaying_time = 10):
         """
         Traces shop
 
@@ -227,7 +228,7 @@ class ShopTracer:
         result = None
         best_state_idx = -1
         for _ in range(attempts):
-            attempt_result = self.do_trace(domain, wait_response_seconds)
+            attempt_result = self.do_trace(domain, wait_response_seconds, delaying_time)
 
             if isinstance(attempt_result, ProcessingStatus):
                 idx = States.states.index(attempt_result.state)
@@ -244,7 +245,7 @@ class ShopTracer:
 
         return result
 
-    def do_trace(self, domain, wait_response_seconds = 60):
+    def do_trace(self, domain, wait_response_seconds = 60, delaying_time = 10):
 
         url = ShopTracer.normalize_url(domain)
 
@@ -253,7 +254,7 @@ class ShopTracer:
 
         user_info, payment_info = self._get_user_data()
 
-        context = TraceContext(domain, user_info, payment_info, self)
+        context = TraceContext(domain, user_info, payment_info, delaying_time, self)
             
         try:
             status = ShopTracer.get(driver, url, wait_response_seconds)
