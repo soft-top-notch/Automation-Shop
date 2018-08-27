@@ -4,7 +4,7 @@ Code that buys something from shops and saves traces.
 Navigation and checkout page filling is heuristic based.
 
 
-###№ Deploy in Test Environment
+### Deploy in Test Environment
 
 Clone retrace_automation repo in trace_automation's parent folder
 ```shell
