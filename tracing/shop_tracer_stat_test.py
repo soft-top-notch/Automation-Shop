@@ -40,7 +40,7 @@ good_urls = [
     'ossur.com',
     'freshfarmscbd.com',
     'naturesbestrelief.com',
-    'www.poundsandinchesaway.com',
+    'poundsandinchesaway.com',
     'bluespringsanimalhospital.com',
     'mikestvbox.com',
 ]
