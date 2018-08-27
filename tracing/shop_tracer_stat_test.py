@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 # All urls
 all_urls = []
-with open('../resources/regression_urls.csv', 'r') as f:
+with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
     rows = csv.reader(f)
     for row in rows:
         url = row[0]
@@ -20,7 +20,7 @@ with open('../resources/regression_urls.csv', 'r') as f:
             all_urls.append(url)
 # Random sample urls
 random.seed(4)
-# sample_urls = random.sample(all_urls, 100)
+sample_urls = random.sample(all_urls, 500)
 
 # Some good urls to analyze by hands
 good_urls = [
