@@ -1,4 +1,0 @@
-wrapt
-requests
-lxml
-image
