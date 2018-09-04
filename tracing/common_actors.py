@@ -381,6 +381,7 @@ class PaymentFields(IStepActor):
 
         inputed_fields = []
         cycle_count = 0
+        address_cnt = 0
         confirm_pwd = False
         index = 0
 
@@ -444,6 +445,7 @@ class PaymentFields(IStepActor):
                         input_texts[index].clear()
                     except:
                         driver.execute_script("arguments[0].click();",input_texts[index])
+                        input_texts[index].clear()
                         pass
                     try:
                         if key == "phone":
@@ -463,6 +465,10 @@ class PaymentFields(IStepActor):
 
                     inputed_fields.append(key)
                     if (key == "password" and not confirm_pwd) or (key == "email") or (key == "street"):
+                        if key == "street":
+                            if address_cnt >= 1:
+                                break
+                            address_cnt += 1
                         confirm_pwd = True
                         inputed_fields.pop()
                     break
@@ -527,8 +533,6 @@ class PaymentFields(IStepActor):
             "address", "street", "city",
             "gift", "vat", "filter"
         ]
-        import pdb;
-        pdb.set_trace()
 
         return self.input_fields_in_checkout(
             driver,
@@ -644,7 +648,7 @@ class PaymentFields(IStepActor):
         agree_btns = find_radio_or_checkbox_buttons(
             driver,
             ["agree", "terms","same", "copy",
-            "different", "register", "remember", "keep", "credit", "paypal",
+            "different", "register", "remember", "keep", "credit",
             "stripe", "mr", "standard", "free", "deliver",
             "billing_to_show", "ground", "idt","gender"],
             ["express"]
@@ -663,9 +667,9 @@ class PaymentFields(IStepActor):
                         continue
                     agree_btns = find_radio_or_checkbox_buttons(
                         driver,
-                        ["agree", "terms", "paypal", "same", "copy",
-                        "different", "remember", "keep", "credit",
-                        "stripe", "register", "mr", "standard", "free",
+                        ["agree", "terms", "same", "copy",
+                        "different", "remember", "keep", "credit", "stripe",
+                        "register", "mr", "standard", "free", "deliver",
                         "billing_to_show", "ground", "idt", "gender"],
                         ["express"]
                     )
@@ -682,6 +686,35 @@ class PaymentFields(IStepActor):
                 else:
                     if agree_btns[index].is_enabled() and not agree_btns[index].is_selected():
                         self.click_radio_or_checkout_button(driver, agree_btns[index])
+                index += 1
+
+        agree_btns = find_radio_or_checkbox_buttons(
+            driver,
+            ["paypal"],
+            ["express", "differ", "register"]
+        )
+        cycle_count = 0
+        index = 0
+
+        if agree_btns:
+            while index < len(agree_btns):
+                try:
+                    check_exception = agree_btns[index].get_attribute("outerHTML")
+                except:
+                    if cycle_count >= 2:
+                        cycle_count = 0
+                        index += 1
+                        continue
+                    agree_btns = find_radio_or_checkbox_buttons(
+                        driver,
+                        ["paypal"],
+                        ["express", "differ", "register"]
+                    )
+                    cycle_count += 1
+                    continue
+
+                if agree_btns[index].is_enabled() and not agree_btns[index].is_selected():
+                    self.click_radio_or_checkout_button(driver, agree_btns[index])
                 index += 1
 
     def check_alert_text(self, driver):
