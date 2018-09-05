@@ -1,27 +1,27 @@
-gccdistribution.com,purchased
-snapliquids.com,purchased
-tilvee.com,purchased
-onlynaturalinc.com,purchased
-theglamourshop.com,purchased
-gaffos.com,purchased
+gaffos.com,purchased,Test that we enter user info in PayPal page after entering it into checkout page
+tattooexpresssupply.com,not purchased,Test that we select payment method by clicking "paypal" radio button in several radio buttons
+blinkoptic.com,not purchased,Test that we proceed filling by removing selected "ship to different address" radio button
+snapliquids.com,purchased,Test that we proceed filling by removing selected "ship to different address" radio button
 mikestvbox.com,purchased
-fragranceliquidators.com,purchased
-eyewearavenue.com,purchased
-ehukka.com,purchased
-tattooexpresssupply.com,purchased
 sunflowershoppe.com,purchased
-copperfish.com,purchased
-naturalstepsformula.com,purchased
-freshfarmscbd.com,purchased
-designeroptics.com,purchased
 dental4savings.com,purchased
+designeroptics.com,purchased,Test that we enter user info in Paypal page after entering it into checkout page and check if "paypal" radio button is clicked. Also test that we proceed filling without clicking "different address" radio button
+naturalstepsformula.com,purchased
+ehukka.com,purchased
+fragranceliquidators.com,purchased
+eyewearavenue.com,purchased,Test that we enter user info in Paypal page after entering it into checkout page
 shoprw.com,not purchased
 earthlymist.com,not purchased
+gccdistribution.com,purchased
+theglamourshop.com,purchased,Test that we select "paypal" payment method by clicking "paypal" radio button in several radio buttons
+onlynaturalinc.com,purchased
+tilvee.com,purchased
+copperfish.com,purchased
+freshfarmscbd.com,not purchased
+growinggardensclothing.com,purchased,Test that we enter user info in Paypal page after entering it into checkout page and check if "paypal" radio button is clicked. Also test that we proceed filling without clicking "different address" radio button
+shoppersadvantage.com,not purchased
+bioactivenutrients.com,not purchased,Test that we select "paypal" payment method by clicking "paypal" radio button in several radio buttons
 your247chemist.com,not purchased
 luggagepoint.com,not purchased
-growinggardensclothing.com,not purchased
-blinkoptic.com,not purchased
-shoppersadvantage.com,not purchased
-bioactivenutrients.com,not purchased
 liquidscentsations.com,not purchased
 castlegoldx.com,not purchased
