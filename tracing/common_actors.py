@@ -495,7 +495,7 @@ class PaymentFields(IStepActor):
             ["(^|_|-|\s)lname,namelast,last_name", "lastname"],
             ["comp", "company"],
             ["post", "zip"],
-            ["address,apartmentc", "street"] # First item is a sub-string to check in text, Second item is a string to add in text
+            ["address,apartment,atp.", "street"] # First item is a sub-string to check in text, Second item is a string to add in text
         ]
         not_contains = [
             "phone(_|-|)(\w|\w\w|\w\w\w|)(2|3)"
@@ -868,7 +868,10 @@ class PaymentFields(IStepActor):
                     pass
             if flag or not continue_btns:
                 continue_btns = []
-                for btn in find_buttons_or_links(driver, ["bill", "proceed", "submit", "create*.*account", "add", "save"], ["modify", "express", "cancel"]):
+                for btn in find_buttons_or_links(driver,
+                            ["bill", "proceed", "submit", "create*.*account",
+                            "add", "save", "select shipping option"],
+                            ["modify", "express", "cancel", "address"]):
                     if btn.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     continue_btns.append(btn)
