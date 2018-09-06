@@ -3,6 +3,9 @@
 Code that buys something from shops and saves traces.
 Navigation and checkout page filling is heuristic based.
 
+#### Installation
+pip install -I trace_automation
+
 #### Mock Data Service
 
 First we need to start data service with mock user data

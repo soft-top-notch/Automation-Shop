@@ -27,12 +27,15 @@ window.__tra_sleep = function(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-window.__tra_expandComboDropDown = async function(left, top, height, handler) {
-    var combo = document.elementFromPoint(left + 1, top + 1);
+window.__tra_expandComboDropDown = async function(left, top, width, height, handler) {
+    var x = left + Math.floor(width / 2),
+        y = top + Math.floor(height / 2);
+
+    var combo = document.elementFromPoint(x, y);
 
     __tra_simulateClick(combo);
     await __tra_sleep(500);
-    elem = document.elementFromPoint(left + 1, top + 1 + height);
+    elem = document.elementFromPoint(x, top + 1 + height);
     while (true) {
         var rect = elem.parentNode.getBoundingClientRect();
         if (rect.x >=left && rect.y >= top) {
@@ -52,9 +55,9 @@ window.__tra_expandComboDropDown = async function(left, top, height, handler) {
    await __tra_sleep(500);
 }
 
-window.__tra_extractComboValues = async function(left ,top, height) {
-    var x = left + 1,
-        y = top + 1;
+window.__tra_extractComboValues = async function(left, top, width, height) {
+    var x = left + Math.floor(width / 2),
+        y = top + Math.floor(height / 2);
     var found = null;
     var combo = document.elementFromPoint(x, y);
     if (combo.tagName === 'SELECT') {
@@ -62,7 +65,7 @@ window.__tra_extractComboValues = async function(left ,top, height) {
     }
     else {
         // expand
-       await __tra_expandComboDropDown(left, top, height, function(result){
+       await __tra_expandComboDropDown(left, top, width, height, function(result){
            found = result;
            // Should close dropdown
            return true;
@@ -76,9 +79,10 @@ window.__tra_extractComboValues = async function(left ,top, height) {
     return result;
 }
 
-window.__tra_selectComboboxValue = async function(left, top, height, text_value) {
-    var x = left + 1,
-        y = top + 1;
+window.__tra_selectComboboxValue = async function(left, top, width, height, text_value) {
+    var x = left + Math.floor(width / 2),
+        y = top + Math.floor(height / 2);
+
     var combo = document.elementFromPoint(x, y);
     if (combo.tagName === 'SELECT') {
         var found = combo.options;
@@ -86,6 +90,7 @@ window.__tra_selectComboboxValue = async function(left, top, height, text_value)
         for (var i = 0; i < found.length; ++i) {
             if (found[i].textContent == text_value){
                 combo.value = found[i].value;
+                combo.dispatchEvent(new Event('change'));
                 return true;
             }
         }

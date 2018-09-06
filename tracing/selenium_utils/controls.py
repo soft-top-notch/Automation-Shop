@@ -1,4 +1,7 @@
 import logging
+import pkg_resources as res
+
+from tracing.selenium_utils.common import *
 
 
 class Types:
@@ -13,19 +16,31 @@ class Types:
 
 
 class Control:
-    def __init__(self, type, location, size, label = None, values = None, min=None, max=None, code=None):
+    def __init__(self, type, elem, label = None, values = None, min=None, max=None, code=None):
         self.type = type
-        self.location = location
-        self.size = size
+        self.elem = elem
         self.label = label
         self.values = values
         self.min = min
         self.max = max
         self.code = code
 
+    @property
+    def location(self):
+        return self.elem.location
+    
+    @property
+    def size(self):
+        return self.elem.size
+
+    def get_center(self):
+        return (self.location['x'] + self.size['width'] // 2, 
+                self.location['y'] + self.size['height'] // 2)
+
+   
     def __str__(self):
-        return "Control: {}, location: {}, size: {}, label: {}, values: {}, min: {}, max = {}".format(
-            self.type, self.location, self.size, self.label, self.values, self.min, self.max
+        return "Control: {}, label: {}, values: {}, min: {}, max = {}".format(
+            self.type, self.label, self.values, self.min, self.max
         )
 
     def __hash__(self):
@@ -47,52 +62,40 @@ class Control:
     @staticmethod
     def create_select(element):
         driver = element.parent
-        loc = element.location
-        size = element.size
         label = get_label(element)
 
-        values = extract_combobox_values(driver, loc['x'], loc['y'], size['width'], size['height'])
-        return Control(Types.select, loc, size, label, values)
+        values = extract_combobox_values(driver, element)
+        return Control(Types.select, element, label, values)
 
     @staticmethod
     def create_input(element):
-        loc = element.location
-        size = element.size
         label = get_label(element)
 
-        return Control(Types.text, loc, size, label)
+        return Control(Types.text, element, label)
 
     @staticmethod
     def create_button(element):
-        loc = element.location
-        size = element.size
         text = element.get_attribute("innerText") or element.get_attribute('value')
 
-        return Control(Types.button, loc, size, text)
+        return Control(Types.button, element, text)
 
     @staticmethod
     def create_link(element):
-        loc = element.location
-        size = element.size
         text = element.get_attribute("innerText")
 
-        return Control(Types.link, loc, size, text, code = element.get_attribute('href'))
+        return Control(Types.link, element, text, code = element.get_attribute('href'))
 
     @staticmethod
     def create_checkbox(element):
-        loc = element.location
-        size = element.size
         label = get_label(element)
 
-        return Control(Types.checkbox, loc, size, label)
+        return Control(Types.checkbox, element, label)
 
     @staticmethod
     def create_radiobutton(element):
-        loc = element.location
-        size = element.size
         label = get_label(element)
 
-        return Control(Types.radiobutton, loc, size, label)
+        return Control(Types.radiobutton, element, label)
 
 
 def is_js_function_exists(driver, function):
@@ -105,15 +108,19 @@ def is_js_function_exists(driver, function):
     return driver.execute_script('return typeof {} === "function"'.format(function))
 
 
-def add_scripts_if_need(driver, file='js/selenium.js', function_to_check = "__tra_sleep"):
+def add_scripts_if_need(driver, file='js/selenium.js', function_to_check = "__tra_sleep", resource=True):
     """
     Adds javascript file to current page
     :param driver:             Web driver
     :param file:               Path to local js file to add
     :param function_to_check:  Function to check weather file has already been added
+    :param resource:           Is file located in tracing package resources
     """
     if function_to_check is not None and is_js_function_exists(driver, function_to_check):
         return
+
+    if resource:
+        file = res.resource_filename('tracing', file)
 
     with open(file) as f:
         script = '\n'.join([line for line in f])
@@ -133,7 +140,15 @@ def execute_async(driver, script):
     return driver.execute_async_script(full_script)
 
 
-def extract_combobox_values(driver, left, top, width, height):
+def scroll_to_element(driver, element):
+    y = element.location['y']
+    
+    scroll_to(driver, max(0, y - 100))
+    scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
+    return (element.location['x'], element.location['y'] - scroll)
+    
+
+def extract_combobox_values(driver, element):
     """
     Extracts combobox values by it's location
     :param driver: Web driver
@@ -143,12 +158,16 @@ def extract_combobox_values(driver, left, top, width, height):
     :return:       List of texts of values that could be selected from the combobox
     """
     add_scripts_if_need(driver)
+    
+    left, top = scroll_to_element(driver, element)
+    height = element.size['height']
+    width = element.size['width']
 
-    script =  '__tra_extractComboValues({},{},{})'.format(left + width // 2, top, height)
+    script =  '__tra_extractComboValues({},{},{},{})'.format(left, top, width, height)
     return execute_async(driver, script)
 
 
-def select_combobox_value(driver, left, top, height, value_text):
+def select_combobox_value(driver, element, value_text):
     """
     Selects combobox value
     :param driver:     Web driver
@@ -158,7 +177,49 @@ def select_combobox_value(driver, left, top, height, value_text):
     :param value_text: Text of value to select
     :return:           Weather select is success or not
     """
-    return execute_async(driver, "__tra_selectComboboxValue({},{},{},'{}')".format(left, top, height, value_text))
+    add_scripts_if_need(driver)
+    
+    left, top = scroll_to_element(driver, element)
+    height = element.size['height']
+    width = element.size['width']
+    return execute_async(driver, "__tra_selectComboboxValue({},{},{},{},'{}')".format(left, top, width, height, value_text))
+
+
+def click(driver, elem):
+    """
+    Clicks at point in the page
+    :param driver:  Web driver
+    :param x:       Left of the page
+    :param y:       Top of the page
+    """
+
+    add_scripts_if_need(driver)
+    
+    x, y = scroll_to_element(driver, elem)
+    height = elem.size['height']
+    width = elem.size['width']
+
+    assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+
+    driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
+
+
+def enter_text(driver, elem, text):
+    """
+    Enters text to text field
+    :param driver:   Web driver
+    :param x:        Left for any point of the text field
+    :param y:        Top for any point of the text field
+    :param text:     Text to input
+    """
+    add_scripts_if_need(driver)
+    
+    x, y = scroll_to_element(driver, elem)
+    height = elem.size['height']
+    width = elem.size['width']
+    assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+
+    driver.execute_script('el = document.elementFromPoint({}, {}); el.value = "{}";'.format(x + width//2, y + height//2, text))
 
 
 def is_visible(elem):
@@ -168,16 +229,17 @@ def is_visible(elem):
     :return:        True if visible and False otherwise
     """
     driver = elem.parent
-
-    loc = elem.location
-    size = elem.size
-
-    if size['width'] <= 1 or size['height'] <= 1:
+    if is_stale(elem):
         return False
 
-    x = loc['x'] + size['width'] // 2
-    y = loc['y'] + size['height'] // 2
+    if elem.size['width'] <= 1 or elem.size['height'] <= 1:
+        return False
 
+    x, y = scroll_to_element(driver, elem)
+
+    x = x + elem.size['width'] // 2
+    y = y + elem.size['height'] // 2
+    
     html = driver.execute_script('el=document.elementFromPoint({}, {});return el ? el.outerHTML:"";'.format(x, y))
     return len(html) > 0 and html in elem.get_attribute('outerHTML')
 
@@ -238,6 +300,8 @@ def gather_click_elements(driver):
 
 
 def extract_controls(driver):
+    scroll_to_top(driver)
+
     selects = [Control.create_select(elem) for elem in get_selects(driver)
                if is_visible(elem)]
     inputs = [Control.create_input(elem) for elem in get_inputs(driver) if is_visible(elem)]

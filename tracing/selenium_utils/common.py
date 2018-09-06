@@ -1,16 +1,16 @@
 from selenium import webdriver
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import WebDriverException
 import logging
 import traceback
-from selenium.webdriver.support.expected_conditions import *
-from selenium.webdriver.common.alert import *
-from selenium.webdriver.support.expected_conditions import staleness_of
-
 import tempfile
 import os
 from PIL import Image
 import time
+
+from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.support.expected_conditions import *
+from selenium.webdriver.common.alert import *
+from selenium.webdriver.support.expected_conditions import staleness_of
 
 
 class Frame:
@@ -28,13 +28,21 @@ class Frame:
             url = self.driver.current_url
             
             # ToDo Do checks without ancors
-            if url == self.url and not is_stale(self.frame):
+            if url == self.url: #and not is_stale(self.frame):
                 self.driver.switch_to.default_content()
 
 
 def is_stale(elem):
-    return staleness_of(elem)
-
+    try:
+        tmp = elem.location
+        tmp = elem.size
+        return False
+    except:
+        logger = logging.getLogger('shop_tracer')
+        exception = traceback.format_exc()
+        logger.debug('during check if can click exception was thrown {}'.format(exception))
+        return True
+    
 
 def can_click(element):
     try:
@@ -225,6 +233,18 @@ def scroll(driver, dw, dh):
     driver.execute_script('window.scrollBy({}, {})'.format(dw, dh))
 
 
+def get_scroll_top(driver):
+    return driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
+
+
+def scroll_to(driver, top):
+    driver.execute_script("document.body.scrollTop = document.documentElement.scrollTop = {};".format(top))
+
+
+def scroll_to_top(driver):
+    scroll_to(driver, 0)
+
+
 def get_scale(driver):
     """
     Calculates scale between screenshot size and page size
@@ -232,7 +252,6 @@ def get_scale(driver):
     :return:         Screenshot width / page width
     """
     fd, path = tempfile.mkstemp(prefix='screenshot', suffix='.png')
-    os.close(fd)
     
     driver.save_screenshot(path)
     w, h = Image.open(path).size
@@ -243,16 +262,6 @@ def get_scale(driver):
     assert abs(scale - h/ih) <= 1e-5
     
     return scale
-
-
-def click(driver, x, y):
-    """
-    Clicks at point in the page
-    :param driver:  Web driver
-    :param x:       Left of the page
-    :param y:       Top of the page
-    """
-    driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x, y))
 
 
 def enter_text(driver, x, y, text):
@@ -285,6 +294,8 @@ def get_full_page_screenshot(driver, output_file, scale):
         return path
     
     try:
+        scroll_to_top(driver)
+
         # take screenshots
         height = get_window_height(driver)
         scrolled = height
@@ -331,5 +342,4 @@ def get_full_page_screenshot(driver, output_file, scale):
                 os.remove(screen)
  
     return output_file
-
 
