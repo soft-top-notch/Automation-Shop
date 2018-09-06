@@ -1,4 +1,3 @@
-import nlp
 import random
 import sys
 import traceback
@@ -6,6 +5,7 @@ import time
 import calendar
 import csv
 
+from nlp import *
 from shop_tracer import *
 from selenium_helper import *
 from common_heuristics import *
@@ -343,9 +343,8 @@ class PaymentFields(IStepActor):
                             ]
                         if nlp.check_text(text, ctns):
                             try:
-                                time.sleep(2)
                                 option.click() # select() in earlier versions of webdriver
-                                time.sleep(2)
+                                time.sleep(1)
                                 result_cnt += 1
                                 flag = True
                                 break
@@ -414,7 +413,6 @@ class PaymentFields(IStepActor):
                     cycle_count = 0
                     index += 1
                     continue
-                time.sleep(2)
                 input_texts = driver.find_elements_by_css_selector("input")
                 input_texts += driver.find_elements_by_css_selector("textarea")
                 cycle_count += 1
@@ -456,9 +454,12 @@ class PaymentFields(IStepActor):
                             input_texts[index].send_keys(nlp.normalize_text(get_name_of_state(context.user_info.state)))
                         elif key == "number":
                             input_texts[index].send_keys(json_Info[key])
-                            time.sleep(5)
+                            time.sleep(3)
                         else:
                             input_texts[index].send_keys(json_Info[key])
+
+                        if not is_userInfo and key == "zip":
+                            time.sleep(2)
                         time.sleep(1)
                     except:
                         break
@@ -473,8 +474,6 @@ class PaymentFields(IStepActor):
                         inputed_fields.pop()
                     break
             index += 1
-
-        time.sleep(1)
 
         if len(inputed_fields) == 1 and inputed_fields[0] == "zip":
             return len(inputed_fields) - 1
@@ -552,7 +551,7 @@ class PaymentFields(IStepActor):
             if element.is_displayed():
                 try:
                     element.click()
-                    time.sleep(3)
+                    time.sleep(2)
                     return True
                 except:
                     pass
@@ -590,8 +589,11 @@ class PaymentFields(IStepActor):
             driver.switch_to_frame(iframe)
             if self.fill_payment_info(driver, context):
                 success_flag = True
-            driver.switch_to_default_content()
 
+            driver.switch_to_default_content()
+            frames = driver.find_elements_by_css_selector("frame")
+            if frames:
+                driver.switch_to_frame(frames[0])
         return success_flag
 
     def click_continue_in_iframe(self, driver):
@@ -639,7 +641,7 @@ class PaymentFields(IStepActor):
         except ElementNotVisibleException:
             driver.execute_script("arguments[0].click();", element)
             pass
-        time.sleep(1)
+        time.sleep(0.5)
 
     def check_agree_and_click(self, driver):
         '''
@@ -742,7 +744,7 @@ class PaymentFields(IStepActor):
             if self.check_alert_text(driver):
                 return 2
             return 0
-        time.sleep(2)
+        time.sleep(1)
 
         required_fields = driver.find_elements_by_css_selector("input")
         required_fields += driver.find_elements_by_css_selector("select")
@@ -787,7 +789,7 @@ class PaymentFields(IStepActor):
                     break
                 except StaleElementReferenceException:
                     error_elements = find_error_elements(driver, ["error", "err", "alert", "advice", "fail"], ["override"])
-                    time.sleep(2)
+                    time.sleep(1)
                     pass
 
             if not error_result:
@@ -821,13 +823,13 @@ class PaymentFields(IStepActor):
                 if self.fill_billing_address(driver, context):
                     is_userinfo = True
                     context.log_step("Fill user information fields")
-                    time.sleep(2)
+                    time.sleep(1)
 
             div_btns = find_elements_with_attribute(driver, "div", "class", "shipping_method")
 
             if div_btns:
                 div_btns[0].click()
-                time.sleep(1)
+                time.sleep(0.5)
 
             if not is_paymentinfo:
                 if self.fill_payment_info(driver, context):
@@ -871,7 +873,7 @@ class PaymentFields(IStepActor):
                 for btn in find_buttons_or_links(driver,
                             ["bill", "proceed", "submit", "create*.*account",
                             "add", "save", "select shipping option"],
-                            ["modify", "express", "cancel", "address"]):
+                            ["modify", "express", "cancel"]):
                     if btn.get_attribute('href') == normalize_url(get_url(driver)):
                         continue
                     continue_btns.append(btn)
@@ -897,7 +899,7 @@ class PaymentFields(IStepActor):
                     return True
                 purchase_text = get_page_text(driver)
                 if nlp.check_text(purchase_text, ["being process"]):
-                    time.sleep(2)
+                    time.sleep(1)
                 elif nlp.check_text(purchase_text, ["credit card to complete your purchase", "secure payment page"]):
                     return True
             elif checked_error == 2:
@@ -978,14 +980,13 @@ class PaymentFields(IStepActor):
         return return_flag
 
     def process_page(self, driver, state, context):
-        time.sleep(3)
         radio_pass = self.find_radio_continue_buttons(driver)
 
         if radio_pass:
             #click an radio as guest....
             if not click_first(driver, radio_pass):
                 return state
-            time.sleep(1)
+            time.sleep(0.5)
 
         continue_pass = self.find_guess_continue_button(driver)
 
@@ -1000,8 +1001,7 @@ class PaymentFields(IStepActor):
             if guest_email:
                 for g_email in guest_email:
                     g_email.send_keys(context.user_info.email)
-
-            time.sleep(1)
+                time.sleep(0.5)
             #click continue button for guest....
             try:
                 continue_pass[0].click()
@@ -1009,7 +1009,7 @@ class PaymentFields(IStepActor):
                 driver.execute_script("arguments[0].click();", continue_pass[0])
                 pass
 
-            time.sleep(1)
+            time.sleep(0.5)
 
         #the case if authentication is not requiring....
         filling_result = self.click_to_order(driver, context)

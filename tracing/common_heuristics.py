@@ -99,7 +99,8 @@ def find_error_elements(driver, contains=None, not_contains=None):
         for div in divs + spans + label + p + ul:
             if div.is_displayed():
                 div_class = div.get_attribute("class")
-                if nlp.check_text(div_class, contains, not_contains) and div.get_attribute("innerHTML").strip():
+                if nlp.check_text(div_class, contains, not_contains) and \
+                    (div.get_attribute("innerHTML").strip() and not "error hide" in div.get_attribute("innerHTML").strip().lower()):
                     result.append(div)
     except:
         result = []
