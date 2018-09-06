@@ -447,6 +447,8 @@ class PaymentFields(IStepActor):
                         pass
                     try:
                         if key == "phone":
+                            if nlp.check_text(input_texts[index].get_attribute("outerHTML"), ["email"]):
+                                continue
                             input_texts[index].send_keys(nlp.remove_letters(json_Info[key], ["(", ")", "-"]))
                         elif key == "country":
                             input_texts[index].send_keys("united states")
@@ -752,7 +754,7 @@ class PaymentFields(IStepActor):
         if error_elements:
             if len(error_elements) == 1 and nlp.check_text(
                 error_elements[0].get_attribute("outerHTML"),
-                ["credit", "merchant", "payment", "security","transaction", "decline", "permit"],
+                ["credit", "merchant", "payment", "security","transaction", "decline", "permit", "authenticat"],
                 ["find", "require"]):
                 return 2
             elif len(error_elements) == 2 and nlp.check_text(error_elements[1].get_attribute("outerHTML"), ["password"]):
