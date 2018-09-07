@@ -3,6 +3,8 @@ from tracing.rl.a3cmodel import A3CModel
 from tracing.rl.rewards import PopupRewardsCalculator
 from tracing.rl.environment import Environment
 from tracing.rl.actor_learner import ActorLearnerWorker
+import numpy as np
+
 import tensorflow as tf
 import threading
 
@@ -41,15 +43,12 @@ workers = []
 
 for i in range(num_workers):
     env = Environment(PopupRewardsCalculator(), user={}, headless=True)
-    workers.append(ActorLearnerWorker("worker-{}".format(i), popup_urls, global_model, env, 1000))
+    workers.append(ActorLearnerWorker("worker-{}".format(i), popup_urls, global_model, env, 1000, lr=0.2))
 
 coord = tf.train.Coordinator()
 session.run(tf.global_variables_initializer())
 
 
-%matplotlib inline
-import numpy as np
-import matplotlib.pyplot as plt
 
 threads = []
 for worker in workers:

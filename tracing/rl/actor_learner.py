@@ -36,7 +36,7 @@ class ActorLearnerWorker(threading.Thread):
     avg_reward = 0
     step_rewards = []
     
-    def __init__(self, name, urls, global_model, env, max_steps = 1000):
+    def __init__(self, name, urls, global_model, env, max_steps = 1000, lr = 0.01, n_step = 5, entropy_l = 0.01, gamma = 0.99):
         threading.Thread.__init__(self)
         
         self.name = name
@@ -47,15 +47,20 @@ class ActorLearnerWorker(threading.Thread):
                                     session = self.session, name = self.name)
         self.env = env
         self.max_steps = max_steps
+
+        self.n_step = n_step
+        self.gamma = gamma
+        self.lr = lr
+        self.entropy_l = entropy_l
     
     def get_url(self):
         return random.choice(self.urls)
     
     def run(self):
-        n_step = 5
-        gamma = 0.99
-        lr = 0.01
-        entropy_l = 0.01
+        n_step = self.n_step
+        gamma = self.gamma
+        lr = self.lr
+        entropy_l = self.entropy_l
         
         with self.env:
             while ActorLearnerWorker.global_step < self.max_steps:

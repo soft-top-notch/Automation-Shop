@@ -26,13 +26,13 @@ class A3CModel:
             with tf.variable_scope(A3CModel.global_scope):
                 self.build_graph()
                 self.add_loss()
-                self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+                self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=A3CModel.global_scope)
                 self.add_train_op()
         else:
             with tf.variable_scope(A3CModel.local_scope + self.name):
                 self.build_graph()
                 self.add_loss()
-                self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+                self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=A3CModel.local_scope + self.name)
                 self.add_update_ops()
 
     
@@ -170,7 +170,7 @@ class A3CModel:
         print('got probabilities:', pi)
         return np.random.choice(range(self.num_actions), p = pi[0])
     
-    def train_from_memory(self, memory, dropout = 0.5, lr = 0.01, er = 0.01):
+    def train_from_memory(self, memory, dropout = 1.0, lr = 0.01, er = 0.01):
         assert not self.is_global, "Can't train Global Model"
         
         # 1. Convert Memory to Input Batch
