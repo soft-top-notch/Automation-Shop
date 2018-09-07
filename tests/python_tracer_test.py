@@ -10,6 +10,7 @@ from selenium_helper import *
 from trace_logger import *
 import common_actors
 import user_data
+from datetime import datetime
 
 from contextlib import contextmanager
 
@@ -20,8 +21,8 @@ def get_tracer(headless=False):
 
     yield tracer
 
-
 logger = logging.getLogger('shop_tracer')
+logger.propagate = False
 logger.setLevel(logging.WARNING)
 
 handler = logging.StreamHandler()
@@ -41,19 +42,23 @@ with open('regression_urls.csv', 'r') as f:
         if url:
             test_urls.append(url)
 
+date_format = "%m-%d-%Y %H:%M:%S"
 results = []
+
 with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
+        old_time = datetime.now()
         status = tracer.trace(url, 60, attempts=3, delaying_time=10)
+        new_time = datetime.now()
 
         if status.state == States.purchased:
-            logger.warning('\n\nfinished url: {}, status: {}, state: {}'.format(url, status, "-----Exactly purchased! Success!-----"))
+            logger.warning("\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Exactly purchased! Success!-----"))
         else:
-            warnning_text = '\n\nfinished url: {}, status: {}, state: {}'.format(url, status, "-----Can't purchase! Failed!-----")
+            warnning_text = "\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Can't purchase! Failed!-----")
             logger.warning(warnning_text)
             results.append(warnning_text)
-
+        logger.warning("\n\n-------Run time: {} minutes-------".format(int((new_time - old_time).total_seconds() / 60.0)))
 
 if not results:
     print("All are succeeded!")
