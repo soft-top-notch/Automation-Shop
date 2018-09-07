@@ -60,8 +60,10 @@ for worker in workers:
 while True:
     time.sleep(30)
     
-    print('\n\n\n\navg_reward:', sum(ActorLearnerWorker.step_rewards) / len(ActorLearnerWorker.step_rewards))
-    print('\n\n\n\n')
+    rewards = ActorLearnerWorker.step_rewards[:]
+    if len(rewards) > 0:
+        print('\n\n\n\navg_reward:', sum(rewards) / len(rewards))
+        print('\n\n\n\n')
     
 coord.join(threads)
 
