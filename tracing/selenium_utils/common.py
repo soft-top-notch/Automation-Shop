@@ -252,7 +252,8 @@ def get_scale(driver):
     :return:         Screenshot width / page width
     """
     fd, path = tempfile.mkstemp(prefix='screenshot', suffix='.png')
-    
+    os.close(fd)
+
     driver.save_screenshot(path)
     w, h = Image.open(path).size
     
