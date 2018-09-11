@@ -44,6 +44,7 @@ with open('regression_urls.csv', 'r') as f:
 
 date_format = "%m-%d-%Y %H:%M:%S"
 results = []
+times = []
 
 with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
@@ -58,7 +59,15 @@ with get_tracer(headless=False) as tracer:
             warnning_text = "\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Can't purchase! Failed!-----")
             logger.warning(warnning_text)
             results.append(warnning_text)
-        logger.warning("\n\n-------Run time: {} minutes-------".format(int((new_time - old_time).total_seconds() / 60.0)))
+        logger.warning("\n\n-------Execute time: {} minutes-------".format(int((new_time - old_time).total_seconds() / 60.0)))
+        times.append(int((new_time - old_time).total_seconds() / 60.0))
+
+logger.warning("\n\n-------Average time: {} minutes-------".format(sum(times) / len(times)))
+
+with open("time.csv", "w") as f:
+    for ind, url in enumerate(test_urls):
+        f.write('{}\t{}\n'.format(url, times[ind]))
+    f.write('{}\t{}\n'.format("Average time", sum(times) / len(times)))
 
 if not results:
     print("All are succeeded!")
