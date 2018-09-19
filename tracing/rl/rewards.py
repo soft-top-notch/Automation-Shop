@@ -40,7 +40,8 @@ class PopupRewardsCalculator(IRewardsCalculator):
         self.had_popup = False
         self.url = None
         self.have_popup = False
-        self.new_url = None   
+        self.new_url = None
+        self.alert_shown = False
     
     def is_displayed(self, elem):
         try:
@@ -69,6 +70,7 @@ class PopupRewardsCalculator(IRewardsCalculator):
         return random.sample(visible, max_num)
     
     def is_popup_exists(self, driver):
+
         # 1. Scroll to Top
         common.scroll_to_top(driver)
 
@@ -91,21 +93,27 @@ class PopupRewardsCalculator(IRewardsCalculator):
         return self.is_final_state
     
     def before_action(self, driver, action):
+        self.alert_shown = False
         self.had_popup = self.is_popup_exists(driver)
         self.url = self.get_domain(driver.current_url)
         
     def after_action(self, driver, action):
+        self.alert_shown = common.find_alert(driver)
+        if self.alert_shown:
+            self.is_final_state = True
+            return
+
         self.have_popup = self.is_popup_exists(driver)
         self.new_url = self.get_domain(driver.current_url)
         self.is_final_state = self.new_url != self.url or not self.have_popup
     
     def calc_reward(self, is_success):
-        if self.new_url != self.url:
-            return -100
+        if self.new_url != self.url or self.alert_shown:
+            return 0
         elif self.had_popup and not self.have_popup:
-            return 100
+            return 3
         elif not is_success:
-            return -100
+            return 0#-1
         else:
             return 0
     
@@ -114,5 +122,5 @@ class PopupRewardsCalculator(IRewardsCalculator):
             return 0
         else:
             # Haven't close popup
-            return -100
+            return 0#-3
 

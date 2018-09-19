@@ -16,7 +16,7 @@ class Types:
 
 
 class Control:
-    def __init__(self, type, elem, label = None, values = None, min=None, max=None, code=None):
+    def __init__(self, type, elem, label = None, values = None, min=None, max=None, code=None, label_elem = None):
         self.type = type
         self.elem = elem
         self.label = label
@@ -24,14 +24,48 @@ class Control:
         self.min = min
         self.max = max
         self.code = code
+        self.label_elem = label_elem
+
+    @staticmethod
+    def get_right_bottom(elem):
+        size = elem.size
+        loc = elem.location
+        
+        # right bottom location
+        return {'x': loc['x'] + size['width'], 
+              'y': loc['y'] + size['height']}
+        
 
     @property
     def location(self):
         return self.elem.location
+
+    @property
+    def ext_location(self):
+        loc = self.elem.location
+        if self.label_elem:
+            loc_2 = self.label_elem.location
+            loc['x'] = min(loc['x'], loc_2['x'])
+            loc['y'] = min(loc['y'], loc_2['y'])
+        
+        return loc
     
     @property
     def size(self):
         return self.elem.size
+
+    @property
+    def ext_size(self):
+        rb = Control.get_right_bottom(self.elem)
+        if self.label_elem:
+            rb2 = Control.get_right_bottom(self.label_elem)
+            rb['x'] = max(rb['x'], rb2['x'])
+            rb['y'] = max(rb['y'], rb2['y'])
+        
+        lt = self.ext_location
+        return {'width': rb['x'] - lt['x'],
+                'height': rb['y'] - lt['y']}
+        
 
     def get_center(self):
         return (self.location['x'] + self.size['width'] // 2, 
@@ -62,16 +96,16 @@ class Control:
     @staticmethod
     def create_select(element):
         driver = element.parent
-        label = get_label(element)
+        label, label_elem = get_label_with_elem(element)
 
         values = extract_combobox_values(driver, element)
-        return Control(Types.select, element, label, values)
+        return Control(Types.select, element, label, values, label_elem = label_elem)
 
     @staticmethod
     def create_input(element):
-        label = get_label(element)
+        label, label_elem = get_label_with_elem(element)
 
-        return Control(Types.text, element, label)
+        return Control(Types.text, element, label, label_elem = label_elem)
 
     @staticmethod
     def create_button(element):
@@ -87,15 +121,15 @@ class Control:
 
     @staticmethod
     def create_checkbox(element):
-        label = get_label(element)
+        label, label_elem = get_label_with_elem(element)
 
-        return Control(Types.checkbox, element, label)
+        return Control(Types.checkbox, element, label, label_elem = label_elem)
 
     @staticmethod
     def create_radiobutton(element):
-        label = get_label(element)
+        label, label_elem = get_label_with_elem(element)
 
-        return Control(Types.radiobutton, element, label)
+        return Control(Types.radiobutton, element, label, label_elem = label_elem)
 
 
 def is_js_function_exists(driver, function):
@@ -244,25 +278,40 @@ def is_visible(elem):
     return len(html) > 0 and html in elem.get_attribute('outerHTML')
 
 
-def get_label(element):
+def get_label_with_elem(element):
     """
     Extracts element label
-    :param element:   WebElement
-    :return:          String Label if label found
+    :param element:      WebElement
+    :return:             Tuple: (Label, Label element)
     """
     driver = element.parent
     id = element.get_attribute("id")
     if id:
         labels = driver.find_elements_by_css_selector('label[for="{}"]'.format(id))
         if labels:
-            return labels[0].get_attribute("innerText")
+            return (labels[0].get_attribute("innerText"), labels[0])
 
     parent = element.find_element_by_xpath('..')
     if parent and parent.tag_name == "label":
-        return parent.get_attribute("innerText")
+        return (parent.get_attribute("innerText"), parent)
 
-    return element.get_attribute('placeholder')
+    placeholder = element.get_attribute('placeholder')
+    if placeholder:
+        return (placeholder, element)
+    
+    return (parent.get_attribute("innerText"), parent)
 
+
+def get_label(element):
+    """
+    Extracts element label
+    :param element:      WebElement
+    :return_label_elem:  if True then returns tuple (label, label_elem)
+    :return:             String Label if label found
+    """
+    label, _ = get_label_with_elem(element)
+    
+    return label
 
 def get_checkboxes(driver):
     return driver.find_elements_by_css_selector("input[type='checkbox']")

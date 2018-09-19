@@ -13,6 +13,8 @@ from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of
 
 
+os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
+
 class Frame:
     def __init__(self, driver, frame=None):
         self.driver = driver
@@ -36,6 +38,7 @@ def is_stale(elem):
     try:
         tmp = elem.location
         tmp = elem.size
+        tmp = elem.get_attribute('outerHTML')
         return False
     except:
         logger = logging.getLogger('shop_tracer')
