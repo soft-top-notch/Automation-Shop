@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 class IRewardsCalculator:
     
-    def start(self):
+    def start(self, driver):
         pass
     
     def before_action(self, driver, action):
@@ -19,7 +19,6 @@ class IRewardsCalculator:
     @abstractmethod
     def is_final(self):
         raise NotImplementedError
-
     
     @abstractmethod
     def calc_reward(self, is_success):
@@ -35,13 +34,14 @@ class PopupRewardsCalculator(IRewardsCalculator):
     def __init__(self):
         self.is_final_state = False
     
-    def start(self):
-        self.is_final_state = False
+    def start(self, driver):
         self.had_popup = False
         self.url = None
         self.have_popup = False
         self.new_url = None
         self.alert_shown = False
+        self.is_final_state = self.is_popup_exists(driver)
+    
     
     def is_displayed(self, elem):
         try:

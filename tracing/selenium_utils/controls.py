@@ -15,8 +15,48 @@ class Types:
     all_types = [text, select, radiobutton, checkbox, link, button]
 
 
+def get_size(elem):
+    driver = elem.parent
+    
+    s = elem.size
+    # Naive check so far
+    if elem.tag_name == 'a' or elem.tag_name == 'span':
+        children = driver.execute_script('return arguments[0].children', elem)
+        if len(children) == 1:
+            child_size = children[0].size
+            s['width'] = max(child_size['width'], s['width'])
+            s['height'] = max(child_size['height'], s['height'])
+    
+    return s
+
+
+def get_location(elem):
+    driver = elem.parent
+    
+    loc = elem.location
+    # Naive check so far
+    if elem.tag_name == 'a' or elem.tag_name == 'span':
+        children = driver.execute_script('return arguments[0].children', elem)
+        children = list(filter(lambda x: x.is_displayed(), children))
+        if len(children) == 1:
+            child_loc = children[0].location
+            loc['x'] = min(child_loc['x'], loc['x'])
+            loc['y'] = min(child_loc['y'], loc['y'])
+    
+    return loc
+
 class Control:
-    def __init__(self, type, elem, label = None, values = None, min=None, max=None, code=None, label_elem = None):
+    def __init__(self, 
+                 type, 
+                 elem, 
+                 label = None, 
+                 values = None, 
+                 min=None, 
+                 max=None, 
+                 code=None, 
+                 label_elem = None,
+                 tooltip = None
+               ):
         self.type = type
         self.elem = elem
         self.label = label
@@ -25,48 +65,43 @@ class Control:
         self.max = max
         self.code = code
         self.label_elem = label_elem
+        self.tooltip = tooltip
+
+        if self.label_elem and not self.label_elem.is_displayed():
+            self.label_elem = None
 
     @staticmethod
     def get_right_bottom(elem):
-        size = elem.size
-        loc = elem.location
+       size = get_size(elem)
+       loc = get_location(elem)
         
         # right bottom location
-        return {'x': loc['x'] + size['width'], 
-              'y': loc['y'] + size['height']}
+       return {'x': loc['x'] + size['width'], 
+             'y': loc['y'] + size['height']}
         
 
     @property
     def location(self):
-        return self.elem.location
-
-    @property
-    def ext_location(self):
-        loc = self.elem.location
+        loc = get_location(self.elem)
         if self.label_elem:
-            loc_2 = self.label_elem.location
+            loc_2 = get_location(self.label_elem)
             loc['x'] = min(loc['x'], loc_2['x'])
             loc['y'] = min(loc['y'], loc_2['y'])
         
         return loc
-    
-    @property
-    def size(self):
-        return self.elem.size
 
     @property
-    def ext_size(self):
+    def size(self):
         rb = Control.get_right_bottom(self.elem)
         if self.label_elem:
             rb2 = Control.get_right_bottom(self.label_elem)
             rb['x'] = max(rb['x'], rb2['x'])
             rb['y'] = max(rb['y'], rb2['y'])
-        
-        lt = self.ext_location
+ 
+        lt = self.location
         return {'width': rb['x'] - lt['x'],
                 'height': rb['y'] - lt['y']}
         
-
     def get_center(self):
         return (self.location['x'] + self.size['width'] // 2, 
                 self.location['y'] + self.size['height'] // 2)
@@ -110,14 +145,16 @@ class Control:
     @staticmethod
     def create_button(element):
         text = element.get_attribute("innerText") or element.get_attribute('value')
+        tooltip = element.get_attribute('tooltip') or element.get_attribute('titile')
 
-        return Control(Types.button, element, text)
+        return Control(Types.button, element, text, tooltip = tooltip)
 
     @staticmethod
     def create_link(element):
         text = element.get_attribute("innerText")
+        tooltip = element.get_attribute('tooltip') or element.get_attribute('titile')
 
-        return Control(Types.link, element, text, code = element.get_attribute('href'))
+        return Control(Types.link, element, text, code = element.get_attribute('href'), tooltip = tooltip)
 
     @staticmethod
     def create_checkbox(element):
@@ -175,10 +212,15 @@ def execute_async(driver, script):
 
 
 def scroll_to_element(driver, element):
-    y = element.location['y']
-    
-    scroll_to(driver, max(0, y - 100))
-    scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
+    last_scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
+    # location could change during scrolling do it until it fixed
+    for i in range(5):
+        y = element.location['y']
+        scroll_to(driver, max(0, y - 200))
+        scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
+        if last_scroll == scroll:
+            break
+        
     return (element.location['x'], element.location['y'] - scroll)
     
 
@@ -267,6 +309,12 @@ def is_visible(elem):
         return False
 
     if elem.size['width'] <= 1 or elem.size['height'] <= 1:
+        return False
+    
+    if elem.size['width'] + elem.location['x'] <= 0:
+        return False
+
+    if elem.size['height'] + elem.location['y'] <= 0:
         return False
 
     x, y = scroll_to_element(driver, elem)

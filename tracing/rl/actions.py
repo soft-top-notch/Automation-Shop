@@ -85,7 +85,7 @@ class InputBMonth(InputBirthday):
     def __str__(self):
         return "InputBMonth"
 
-    
+
 class InputBYear(InputBirthday):
     def get_contains(self):
         return ['1972', '72']

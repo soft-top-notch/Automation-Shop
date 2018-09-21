@@ -241,12 +241,20 @@ def get_scroll_top(driver):
 
 
 def scroll_to(driver, top):
+    max_scroll = get_page_height(driver) - get_window_height(driver)
+    top = min(max_scroll, top)
     driver.execute_script("document.body.scrollTop = document.documentElement.scrollTop = {};".format(top))
 
 
 def scroll_to_top(driver):
     scroll_to(driver, 0)
 
+
+def get_viewport_size(driver):
+    iw, ih = driver.execute_script("var w=window;return [w.innerWidth, w.innerHeight];")
+    
+    return {'width': iw, 'height': ih}
+    
 
 def get_scale(driver):
     """

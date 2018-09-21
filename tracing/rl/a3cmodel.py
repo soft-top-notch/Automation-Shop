@@ -105,7 +105,8 @@ class A3CModel:
                                   weights_regularizer = l2_reg
                                 ):
 
-                net, endpoints = nets.nasnet.pnasnet.build_pnasnet_mobile(self.img, None)
+                self.net, endpoints = nets.nasnet.pnasnet.build_pnasnet_mobile(self.img, None)
+                self.fc2 = slim.fully_connected(self.net, 100)
 
             with slim.arg_scope([slim.conv2d, slim.fully_connected],
                                   weights_initializer = xavier_init,
@@ -113,7 +114,6 @@ class A3CModel:
                                   weights_regularizer = l2_reg
                                  ):
  
-                self.fc2 = slim.fully_connected(net, 100)
                 self.flat = slim.dropout(self.fc2, self.dropout, scope='dropout')
 
                 # Policy
@@ -128,21 +128,19 @@ class A3CModel:
 
                                 
     def add_loss(self):
-        # Advantage: reward - value        
+        # Advantage: reward - value
+        # Reward couldn't be negative 
         self.advantage = self.rewards - tf.clip_by_value(self.v, 0, 1000)
+
         # Batch
         self.value_loss = tf.losses.mean_squared_error(self.rewards, self.v)
         
         # Policy Loss: Log(pi) * advantage
         # Batch x actions
-        actions = tf.one_hot(self.performed_actions, self.num_actions, dtype=tf.float32)
-        
-        # Batch x Actions
-        
-        #self.policy_loss = #actions * tf.log(self.pi)
         self.policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
              labels = self.performed_actions, 
              logits = self.possible_logits)
+
         # Batch
         self.policy_loss *= tf.stop_gradient(self.advantage)
         self.policy_loss = tf.reduce_mean(self.policy_loss)
@@ -162,7 +160,6 @@ class A3CModel:
            
 
     def add_train_op(self):
-        #self.opt = tf.train.AdamOptimizer(self.lr, use_locking=True)
         self.opt = tf.train.GradientDescentOptimizer(self.lr, use_locking=True)
 
 
