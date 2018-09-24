@@ -16,8 +16,8 @@ class Environment:
                  user = None, 
                  width = 672, # Width of screenshot
                  headless = True,
-                 crop_h = 224,
-                 crop_w = 224,
+                 crop_h = 300,
+                 crop_w = 300,
                  crop_pad = 5
                 ):
         self.rewards = rewards
@@ -58,10 +58,15 @@ class Environment:
             self.step = 0
             self.controls = None
             self.c_idx = 0
+            self.frames = None
+            self.f_idx = 0
             if self.screen_scale is None:
                 self.screen_scale = common.get_scale(self.driver)
 
-            return not self.rewards.is_final()
+            if self.rewards:
+                return not self.rewards.is_final()
+            else:
+                return True
         
         except:
             traceback.print_exc()
@@ -83,15 +88,27 @@ class Environment:
 
 
     def has_next_control(self):
-        if self.controls is None:
-            self.controls = self.get_controls()
+        if self.frames is None:
+            self.frames = common.get_frames(self.driver)
+            self.f_idx = 0
+
         
-        while self.c_idx < len(self.controls):
-            ctrl = self.controls[self.c_idx]
-            if not common.is_stale(ctrl.elem) and selenium_controls.is_visible(ctrl.elem):
-                return True
-            
-            self.c_idx += 1
+        while self.f_idx < len(self.frames):
+            self.try_switch_to_frame()
+
+            if self.controls is None:
+                self.controls = self.get_controls()
+        
+            while self.c_idx < len(self.controls):
+                ctrl = self.controls[self.c_idx]
+                if not common.is_stale(ctrl.elem) and selenium_controls.is_visible(ctrl.elem):
+                    return True
+    
+                self.c_idx += 1
+
+            self.driver.switch_to.default_content()
+            self.f_idx += 1
+            self.controls = None
 
         return False
     
@@ -256,8 +273,6 @@ class Environment:
     # Returns input images for different controls
     def get_controls(self):
         
-        common.scroll_to_top(self.driver)
-        
         controls = selenium_controls.extract_controls(self.driver)
 
         # Sort by Top then by Left of control location
@@ -265,20 +280,35 @@ class Environment:
         
         return controls
 
+    def try_switch_to_frame(self):
+        try:
+           if self.frames and self.f_idx < len(self.frames):
+               self.driver.switch_to.frame(self.frames[self.f_idx])
+        except:
+            print("there is not frame")
+
        
     def apply_action(self, control, action):
+        # Switch to main frame 
         success = False
         try:
             if self.rewards:
+                self.driver.switch_to.default_content()        
                 self.rewards.before_action(self.driver, action)
             self.step += 1
+
+            if self.rewards:
+                 self.try_switch_to_frame()
             success = action.apply(control, self.driver, self.user)
         except:
             success = False
             traceback.print_exc()
+
         finally:
             if self.rewards:
+                self.driver.switch_to.default_content()
                 self.rewards.after_action(self.driver, action)
+                self.try_switch_to_frame()
             
         return self.rewards.calc_reward(success) if self.rewards else None
     

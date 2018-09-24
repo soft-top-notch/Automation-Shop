@@ -40,7 +40,7 @@ class PopupRewardsCalculator(IRewardsCalculator):
         self.have_popup = False
         self.new_url = None
         self.alert_shown = False
-        self.is_final_state = self.is_popup_exists(driver)
+        self.is_final_state = not self.is_popup_exists(driver)
     
     
     def is_displayed(self, elem):

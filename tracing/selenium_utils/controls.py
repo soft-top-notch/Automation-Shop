@@ -112,21 +112,28 @@ class Control:
             self.type, self.label, self.values, self.min, self.max
         )
 
+    def str_values(self):
+        return ','.join(self.values or [])
+
     def __hash__(self):
         return (hash(self.type) ^
                 hash(self.location['x']) ^
                 hash(self.location['y']) ^
                 hash(self.size['width']) ^
-                hash(self.size['height']))
+                hash(self.size['height']) ^
+                hash(self.str_values()) ^
+                hash(self.label or '')
+              )
 
     def __eq__(self, other):
         return (
                 self.__class__ == other.__class__ and
                 self.type == other.type and
-                self.location['x'] == other.location['x'] and
-                self.location['y'] == other.location['y'] and
-                self.size['width'] == other.size['width'] and
-                self.size['height'] == other.size['height'])
+                (self.values or []) == (other.values or []) and
+                self.location == other.location and 
+                self.size == other.size and
+                (self.label or '') ==( other.label or '')
+               )
 
     @staticmethod
     def create_select(element):
@@ -397,10 +404,10 @@ def gather_click_elements(driver):
 
 
 def extract_controls(driver):
-    scroll_to_top(driver)
-
+    frames = get_frames(driver)
+    
     selects = [Control.create_select(elem) for elem in get_selects(driver)
-               if is_visible(elem)]
+       if is_visible(elem)]
     inputs = [Control.create_input(elem) for elem in get_inputs(driver) if is_visible(elem)]
     buttons = [Control.create_button(elem) for elem in get_buttons(driver) if is_visible(elem)]
     links = [Control.create_link(elem) for elem in get_links(driver) if is_visible(elem)]
@@ -409,8 +416,9 @@ def extract_controls(driver):
     radios = [Control.create_radiobutton(elem) for elem in get_radiobuttons(driver) if is_visible(elem)]
 
     others = [Control.create_button(elem) for elem in gather_click_elements(driver) if is_visible(elem)]
-
-    controls = selects + inputs + buttons + links + checkboxes + radios + others
+ 
+    controls = (selects + inputs + buttons + links + checkboxes + radios + others)
+    
     return list(set(controls))
 
 

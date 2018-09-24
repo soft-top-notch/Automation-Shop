@@ -73,7 +73,8 @@ class ActorLearnerWorker(threading.Thread):
                          entropy_l = 0.01, 
                          gamma = 0.99, 
                          dropout = 0.5,
-                         steps_lr_decay = 10 # Number of steps after which learning rate should decay
+                         l2 = 0.01,
+                         steps_lr_decay = 20 # Number of steps after which learning rate should decay
                 ):
         threading.Thread.__init__(self)
         
@@ -81,16 +82,21 @@ class ActorLearnerWorker(threading.Thread):
         self.urls = urls
         self.session = global_model.session
         self.global_model = global_model
-        self.local_model = A3CModel(global_model.num_actions, global_model = global_model, 
-                                    session = self.session, name = self.name)
+        #self.local_model = A3CModel(global_model.num_actions, global_model = global_model, 
+        #                            session = self.session, name = self.name)
+        
+        self.local_model = global_model        
+        
         self.env = env
         self.max_steps = max_steps
 
         self.n_step = n_step
         self.gamma = gamma
         self.lr = lr
+        
         self.entropy_l = entropy_l
         self.dropout = dropout
+        self.l2 = l2
         self.steps_lr_decay = steps_lr_decay
     
     def get_url(self):
@@ -110,7 +116,9 @@ class ActorLearnerWorker(threading.Thread):
                      losses = self.local_model.train_from_memory(memory, 
                                                                  dropout = self.dropout, 
                                                                  lr = self.get_lr(), 
-                                                                 er = self.entropy_l)
+                                                                 er = self.entropy_l,
+                                                                 l2 = self.l2
+                                                                )
              
              return
         
@@ -120,8 +128,8 @@ class ActorLearnerWorker(threading.Thread):
         last_best.append((memories, reward))
     
     def get_lr(self):
-        step = ActorLearnerWorker.global_step // steps_lr_decay
-        return lr * 1.0 / (1 + step)
+        step = ActorLearnerWorker.global_step // self.steps_lr_decay
+        return self.lr * 1.0 / (1 + step)
     
     def run(self):        
         with self.env:
@@ -179,7 +187,9 @@ class ActorLearnerWorker(threading.Thread):
                     losses = self.local_model.train_from_memory(memory, 
                                                                 dropout = self.dropout, 
                                                                 lr = self.get_lr(),
-                                                                er = self.entropy_l)
+                                                                er = self.entropy_l,
+                                                                l2 = self.l2
+                                                               )
                     print('policy_loss: {}, value_loss: {}, entropy_loss: {}'.format(losses[0], losses[1], losses[2]))
                     
                     if is_final:
@@ -187,5 +197,5 @@ class ActorLearnerWorker(threading.Thread):
                         ActorLearnerWorker.avg_reward = ActorLearnerWorker.avg_reward * 0.99 + 0.01 * sum_reward
                         ActorLearnerWorker.step_rewards.append(sum_reward)
                         self.on_finished(url, memories, sum_reward)
-                        print(sum_reward)
+                        print('sum_reward for {} is {}'.format(url, sum_reward))
                         break
