@@ -42,7 +42,12 @@ class Environment:
 
     def start(self, url):
         self.try_quit_driver()
-        
+        self.step = 0
+        self.controls = None
+        self.c_idx = 0
+        self.frames = None
+        self.f_idx = 0
+
         try:
             self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
 
@@ -55,11 +60,6 @@ class Environment:
             if self.rewards:
                 self.rewards.start(self.driver)
 
-            self.step = 0
-            self.controls = None
-            self.c_idx = 0
-            self.frames = None
-            self.f_idx = 0
             if self.screen_scale is None:
                 self.screen_scale = common.get_scale(self.driver)
 
@@ -94,7 +94,8 @@ class Environment:
 
         
         while self.f_idx < len(self.frames):
-            self.try_switch_to_frame()
+            if not self.try_switch_to_frame():
+                continue
 
             if self.controls is None:
                 self.controls = self.get_controls()
@@ -106,7 +107,7 @@ class Environment:
     
                 self.c_idx += 1
 
-            self.driver.switch_to.default_content()
+            self.try_switch_to_default()       
             self.f_idx += 1
             self.controls = None
 
@@ -280,20 +281,32 @@ class Environment:
         
         return controls
 
+    
     def try_switch_to_frame(self):
         try:
-           if self.frames and self.f_idx < len(self.frames):
-               self.driver.switch_to.frame(self.frames[self.f_idx])
+            if self.frames and self.f_idx < len(self.frames):
+                self.driver.switch_to.frame(self.frames[self.f_idx])
+                return True
         except:
-            print("there is not frame")
+            pass
+        
+        return False
 
-       
+    
+    def try_switch_to_default(self):
+        try:
+            self.driver.switch_to.default_content()
+            return True
+        except:
+            return False
+            
+    
     def apply_action(self, control, action):
         # Switch to main frame 
         success = False
         try:
             if self.rewards:
-                self.driver.switch_to.default_content()        
+                self.try_switch_to_default()       
                 self.rewards.before_action(self.driver, action)
             self.step += 1
 
@@ -306,7 +319,8 @@ class Environment:
 
         finally:
             if self.rewards:
-                self.driver.switch_to.default_content()
+                self.try_switch_to_default()       
+
                 self.rewards.after_action(self.driver, action)
                 self.try_switch_to_frame()
             

@@ -133,7 +133,6 @@ class ActorLearnerWorker(threading.Thread):
     
     def run(self):        
         with self.env:
-            self.local_model.pull_global()
             while ActorLearnerWorker.global_step < self.max_steps:
                 ActorLearnerWorker.global_step += 1
                 url = self.get_url()

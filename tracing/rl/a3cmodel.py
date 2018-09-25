@@ -115,7 +115,6 @@ class A3CModel:
                 
                 # Batch x Channels
                 self.net = slim.flatten(self.net)
-                #self.net  = tf.reshape(self.net, (-1, 1536))
                 
                 if not self.train_deep:
                     self.net = tf.stop_gradient(self.net)
