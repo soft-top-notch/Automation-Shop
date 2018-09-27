@@ -7,7 +7,7 @@ import os
 import numpy as np
 import traceback
 import time
-    
+
 
 class Environment:
     
@@ -41,7 +41,7 @@ class Environment:
     
 
     def start(self, url):
-        self.try_quit_driver()
+#        self.try_quit_driver()
         self.step = 0
         self.controls = None
         self.c_idx = 0
@@ -49,7 +49,10 @@ class Environment:
         self.f_idx = 0
 
         try:
-            self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
+            if not self.driver:
+                self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
+                self.driver.set_page_load_timeout(120)
+
 
             if not url.startswith('http://') and not url.startswith('https://'):
                 url = 'http://' + url

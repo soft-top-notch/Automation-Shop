@@ -40,22 +40,12 @@ class A3CModel:
         saver.restore(self.session, checkpoint)
         
     
-    def init(self):
-        if self.init_op is None:
-            self.init_op = tf.variables_initializer(self.all_params, name='init')
-
-        self.session.run(self.init_op)
-
     def save(self, filename):
-        assert self.is_global, "only global model makes sense to save and load"
-        
         if not self.saver:
             self.saver = tf.train.Saver()
         self.saver.save(self.session, filename)
         
     def restore(self, filename):
-        assert self.is_global, "only global model makes sense to save and load"
-        
         if not self.saver:
             self.saver = tf.train.Saver()
         
@@ -69,8 +59,6 @@ class A3CModel:
         self.build_graph()
         self.add_loss()
         self.add_train_op()
-        self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=A3CModel.global_scope)
-        self.all_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=A3CModel.global_scope)
             
     
     def build_graph(self):
@@ -174,27 +162,6 @@ class A3CModel:
         self.train_op = tf.group(policy_train_op, value_train_op)
         
 
-    def add_update_ops(self):
-        assert not self.is_global, "Can't add pull and push operations to global model"
-        assert self.global_model is not None, "Global model must bet set"
-        assert self.global_model.opt is not None, "Global model must have optimizer .opt"
-               
-        with tf.name_scope('update'):
-            # Pull variables from global model
-            self.pull_global_op = [local_var.assign(global_var) for local_var, global_var in 
-                            zip(self.params, self.global_model.params)]
-            
-            # Add gradients to global model variables
-            opt = self.global_model.opt
-        
-            # Gradients Computation
-            self.grads = [g for g in tf.gradients(self.loss, self.params)]
-            self.grads = [(g, v) for (g, v) in zip(self.grads, self.global_model.params) if g is not None]
-            self.grads = [(tf.clip_by_value(g, -200., 200.), v) for g, v in self.grads]
-            
-            self.update_global_op = opt.apply_gradients(self.grads)
-            
-    
     def get_action(self, image, possible_actions):
         """
         Returns Action Id

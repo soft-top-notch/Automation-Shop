@@ -8,6 +8,11 @@ import tensorflow as tf
 import threading
 import csv, re
 import random
+import os
+
+
+os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
+
 
 hard_popup_urls = [
     # Choose from two options popups
@@ -129,7 +134,7 @@ test_urls = popup_urls[split:]
 tf.reset_default_graph()
 session = tf.Session()
 
-num_workers = 4
+num_workers = 8
 
 global_model = A3CModel(len(Actions.actions), session = session, train_deep = False)
 session.run(tf.global_variables_initializer())
@@ -155,20 +160,28 @@ for i in range(num_workers):
 coord = tf.train.Coordinator()
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 def start(worker):
     while True:
         try:
-            worker.run()
-            break
+            if ActorLearnerWorker.global_step < worker.max_steps:
+                worker.run()
+            else:
+                return
         except:
             traceback.print_exc()
-            pass
         
+checkpoint = None
+for i in range(100):
+    fname = 'checkpoint-{}'.format(i)
+    if os.path.exists(fname):
+        checkpoint = fname
+
+if checkpoint:
+    global_model.restore(checkpoint)
 
 threads = []
-for worker in workers[:4]:
+for worker in workers:
     thread = threading.Thread(target=lambda: start(worker))
     thread.daemon = True 
     thread.start()
@@ -180,12 +193,14 @@ while True:
     time.sleep(60)
     
     rewards = ActorLearnerWorker.step_rewards[:]
-    if len(rewards) > 0:
-        print('-----> avg_reward:', sum(rewards) / len(rewards))
+    steps = len(rewards)
+    if steps > 0:
+        print('\n\n-----> avg_reward {} after {} steps\n\n'.format(sum(rewards) / steps, steps))
 
-    step = len(rewards) // 100
-    if step > 0 and saved.get(step) is None:
-        global_model.save('checkpoint-{}'.format(step))
-        saved[step] = True
+    portion = steps // 30
+    if portion > 0 and saved.get(portion) is None:
+        print('saving model', portion)
+        global_model.save('checkpoint-{}'.format(portion))
+        saved[portion] = True
     
 coord.join(threads)
