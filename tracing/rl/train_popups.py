@@ -70,7 +70,7 @@ def create_popup_dataset(dataset_file):
     def create_driver():
         for i in range(10):
             try:
-                return common.create_chrome_driver(headless = False, size=(1280, 1024))
+                return common.create_chrome_driver(headless = True, size=(1280, 1024))
             except:
                 time.sleep(2)
         
@@ -173,11 +173,12 @@ def start(worker):
         
 checkpoint = None
 for i in range(100):
-    fname = 'checkpoint-{}'.format(i)
+    fname = './checkpoint-{}'.format(i)
     if os.path.exists(fname):
         checkpoint = fname
 
 if checkpoint:
+    print('loading checkpoint', checkpoint)
     global_model.restore(checkpoint)
 
 threads = []
@@ -200,7 +201,7 @@ while True:
     portion = steps // 30
     if portion > 0 and saved.get(portion) is None:
         print('saving model', portion)
-        global_model.save('checkpoint-{}'.format(portion))
+        global_model.save('./checkpoint-{}'.format(portion))
         saved[portion] = True
     
 coord.join(threads)

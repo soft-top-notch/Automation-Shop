@@ -30,7 +30,6 @@ class A3CModel:
         
     
     def init_from_checkpoint(self, checkpoint):
-        self.init()
         
         inception_vars = tf.get_collection(
             tf.GraphKeys.GLOBAL_VARIABLES, 
