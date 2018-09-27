@@ -82,6 +82,9 @@ class PopupRewardsCalculator(IRewardsCalculator):
         for ctrl in controls:
             if not selenium_controls.is_visible(ctrl):
                 covered += 1
+
+            if covered >= 3:
+                return True
         
         print('controls: {}, covered: {}'.format(len(controls), covered))
         return covered >= 3

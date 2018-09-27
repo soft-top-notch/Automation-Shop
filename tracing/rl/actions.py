@@ -93,7 +93,26 @@ class InputBYear(InputBirthday):
     def __str__(self):
         return "InputBYear"
 
+
+class InputEmail(IAction):
+    def is_applicable(self, ctrl):
+        return ctrl.type in [Types.text]
+        
+    def apply(self, ctrl, driver, user):
+        if self.is_applicable(ctrl):
+            email = user.get('email', 'test@gmail.com')
+
+            enter_text(driver, ctrl.elem, email)
+            time.sleep(1)
+
+            return True
+        
+        return False
     
+    def __str__(self):
+        return "Input Email"
+
+
 class Click(IAction):
     
     def is_applicable(self, ctrl):
@@ -135,5 +154,5 @@ class Nothing(IAction):
 
 
 class Actions:
-    actions = [InputBDay(), InputBMonth(), InputBYear(), Click(), Nothing()]
+    actions = [InputBDay(), InputBMonth(), InputBYear(), Click(), InputEmail(), Nothing()]
 
