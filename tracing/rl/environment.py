@@ -41,7 +41,6 @@ class Environment:
     
 
     def start(self, url):
-#        self.try_quit_driver()
         self.step = 0
         self.controls = None
         self.c_idx = 0
@@ -51,8 +50,7 @@ class Environment:
         try:
             if not self.driver:
                 self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
-                self.driver.set_page_load_timeout(120)
-
+                self.driver.set_page_load_timeout(60)
 
             if not url.startswith('http://') and not url.startswith('https://'):
                 url = 'http://' + url
@@ -92,16 +90,16 @@ class Environment:
 
     def has_next_control(self):
         if self.frames is None:
+            # First enter after start
             self.frames = common.get_frames(self.driver)
             self.f_idx = 0
+            self.controls = None
 
-        
+        # Extract controls from every frame
         while self.f_idx < len(self.frames):
-            if not self.try_switch_to_frame():
-                continue
-
             if self.controls is None:
                 self.controls = self.get_controls()
+                self.c_idx = 0
         
             while self.c_idx < len(self.controls):
                 ctrl = self.controls[self.c_idx]
@@ -110,9 +108,16 @@ class Environment:
     
                 self.c_idx += 1
 
-            self.try_switch_to_default()       
-            self.f_idx += 1
             self.controls = None
+            
+            # Finding for the next frame
+            self.f_idx += 1
+            while self.f_idx < len(self.frames):
+                self.try_switch_to_default()
+                if self.try_switch_to_frame():
+                    break
+                    
+                self.f_idx += 1
 
         return False
     
@@ -288,7 +293,10 @@ class Environment:
     def try_switch_to_frame(self):
         try:
             if self.frames and self.f_idx < len(self.frames):
-                self.driver.switch_to.frame(self.frames[self.f_idx])
+                frame = self.frames[self.f_idx]
+                if frame:
+                    self.driver.switch_to.frame(self.frames[self.f_idx])
+ 
                 return True
         except:
             pass
