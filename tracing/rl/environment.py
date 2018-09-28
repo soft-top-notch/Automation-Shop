@@ -50,7 +50,7 @@ class Environment:
         try:
             if not self.driver:
                 self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
-                self.driver.set_page_load_timeout(60)
+                self.driver.set_page_load_timeout(120)
 
             if not url.startswith('http://') and not url.startswith('https://'):
                 url = 'http://' + url

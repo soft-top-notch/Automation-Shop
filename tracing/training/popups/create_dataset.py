@@ -22,7 +22,9 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
     def create_driver():
         for i in range(10):
             try:
-                return common.create_chrome_driver(headless = True, size=(1280, 1024))
+                driver = common.create_chrome_driver(headless = True, size=(1280, 1024))
+                driver.set_page_load_timeout(120)
+                return driver
             except:
                 time.sleep(2)
         
@@ -43,14 +45,14 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
     processed = 0
 
     tmp_file = dataset_file + '.tmp'
-    if os.path.isfile(tmp_file):
-        if not reuse_cache:
-            mode = 'w'
-        else:
-            mode = 'a'
-            with open(tmp_file, 'r') as f:
-                for line in lines:
-                    processed += 1
+    mode = 'w'
+    if os.path.isfile(tmp_file) and reuse_cache:
+        mode = 'a'
+        with open(tmp_file, 'r') as f:
+            for line in f:
+                processed += 1
+
+        print('read from previous run cache {} urls'.format(processed))
     
     with open(tmp_file, mode) as f:
         driver = create_driver()
