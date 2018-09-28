@@ -3,6 +3,7 @@ from tracing.rl.environment import Environment
 import threading
 import csv, re
 import random
+import traceback
 
 
 def create_popup_dataset(dataset_file, reuse_cache = True):
