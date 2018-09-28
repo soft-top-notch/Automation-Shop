@@ -13,6 +13,8 @@ import os
 
 os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
 
+resources = '../../../resources'
+dataset_file = resources + '/popups_dataset.csv'
 
 hard_popup_urls = [
     # Choose from two options popups
@@ -53,15 +55,15 @@ no_popup_urls = [
 ]
 
 
-assert os.path.isfile('../../resources/popup_dataset.csv'), 'file ../../resources/popup_urls.csv must exists'
+assert os.path.isfile(dataset_file), 'Dataset file {} is not exists'.format(dataset_file)
 
 urls = []
 with open(dataset_file) as f:
     for row in f:
         url, is_popup = row.strip().split('\t')
-        result.append((url, is_popup == '1'))
+        urls.append((url, is_popup == '1'))
 
-popup_urls = list([url for (url, is_popup) in extracted_popup_urls if is_popup==True])
+popup_urls = list([url for (url, is_popup) in urls if is_popup==True])
 random.shuffle(popup_urls)
 
 split = int(len(popup_urls) * 0.8)
@@ -72,7 +74,7 @@ test_urls = popup_urls[split:]
 tf.reset_default_graph()
 session = tf.Session()
 
-num_workers = 8
+num_workers = 16
 
 global_model = A3CModel(len(Actions.actions), session = session, train_deep = False)
 session.run(tf.global_variables_initializer())
@@ -111,8 +113,8 @@ def start(worker):
         
 checkpoint = None
 for i in range(100):
-    fname = './checkpoint-{}'.format(i)
-    if os.path.exists(fname):
+    fname = './checkpoints/checkpoint-{}'.format(i)
+    if os.path.exists(fname + '.index'):
         checkpoint = fname
 
 if checkpoint:
@@ -136,10 +138,10 @@ while True:
     if steps > 0:
         print('\n\n-----> avg_reward {} after {} steps\n\n'.format(sum(rewards) / steps, steps))
 
-    portion = steps // 30
+    portion = steps // 100
     if portion > 0 and saved.get(portion) is None:
         print('saving model', portion)
-        global_model.save('./checkpoint-{}'.format(portion))
+        global_model.save('./checkpoints/checkpoint-{}'.format(portion))
         saved[portion] = True
     
 coord.join(threads)

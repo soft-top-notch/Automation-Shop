@@ -41,6 +41,7 @@ class Environment:
     
 
     def start(self, url):
+        self.try_quit_driver()
         self.step = 0
         self.controls = None
         self.c_idx = 0
@@ -49,9 +50,8 @@ class Environment:
         self.frame_x, self.frame_y = 0, 0
 
         try:
-            if not self.driver:
-                self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
-                self.driver.set_page_load_timeout(120)
+            self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
+            self.driver.set_page_load_timeout(120)
 
             if not url.startswith('http://') and not url.startswith('https://'):
                 url = 'http://' + url
