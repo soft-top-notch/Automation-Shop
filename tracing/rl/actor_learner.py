@@ -1,7 +1,7 @@
 import random
 import threading
-from a3cmodel import A3CModel
-from actions import *
+from tracing.rl.a3cmodel import A3CModel
+from tracing.rl.actions import *
 
 class ActionsMemory:
     def __init__(self, gamma):

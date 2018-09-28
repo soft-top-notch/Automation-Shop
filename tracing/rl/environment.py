@@ -1,7 +1,7 @@
 import tempfile
 import tracing.selenium_utils.common as common
 import tracing.selenium_utils.controls as selenium_controls
-from PIL import Image
+import PIL
 from scipy import misc
 import os
 import numpy as np
@@ -46,6 +46,7 @@ class Environment:
         self.c_idx = 0
         self.frames = None
         self.f_idx = 0
+        self.frame_x, self.frame_y = 0, 0
 
         try:
             if not self.driver:
@@ -87,16 +88,36 @@ class Environment:
 
         self.driver = None
 
+    def get_next_frame(self, move = True):
+        if move:
+            self.f_idx += 1
 
+        while True:
+            self.try_switch_to_default()
+            self.frames = self.get_frames()
+            
+            if self.f_idx >= len(self.frames):
+                return False
+            
+            if not self.try_switch_to_frame():
+                self.f_idx += 1
+                continue
+            
+            self.controls = None
+            self.c_idx = 0
+            return True
+
+        return True
+        
+        
     def has_next_control(self):
         if self.frames is None:
             # First enter after start
-            self.frames = common.get_frames(self.driver)
-            self.f_idx = 0
-            self.controls = None
+            if not self.get_next_frame(move=False):
+                return False
 
         # Extract controls from every frame
-        while self.f_idx < len(self.frames):
+        while True:
             if self.controls is None:
                 self.controls = self.get_controls()
                 self.c_idx = 0
@@ -111,14 +132,9 @@ class Environment:
             self.controls = None
             
             # Finding for the next frame
-            self.f_idx += 1
-            while self.f_idx < len(self.frames):
-                self.try_switch_to_default()
-                if self.try_switch_to_frame():
-                    break
-                    
-                self.f_idx += 1
-
+            if not self.get_next_frame():
+                return False
+            
         return False
     
 
@@ -148,12 +164,12 @@ class Environment:
             common.get_screenshot(self.driver, tmp)
 
         # 3. Resize image
-        img = Image.open(tmp)
+        img = PIL.Image.open(tmp)
         width_scale = self.width / float(img.size[0]) / scale
 
         width = int(self.width / scale)
         height = int((img.size[1] * width_scale))
-        img = img.resize((width, height), Image.ANTIALIAS)
+        img = img.resize((width, height), PIL.Image.ANTIALIAS)
         img.save(tmp)
         
         self.scale = width_scale * self.screen_scale
@@ -248,8 +264,8 @@ class Environment:
         image = self.get_screenshot_as_array(scale=scale)
         
         [h, w, _] = image.shape
-        top = y              
-        left = x
+        top = y + self.frame_y
+        left = x +  self.frame_x
         bottom = top + ctrl.size['height']
         right = left + ctrl.size['width']
         
@@ -290,15 +306,49 @@ class Environment:
         return controls
 
     
+    def get_frames(self):
+        win_height = common.get_page_height(self.driver)
+        win_width = self.driver.execute_script('return window.innerHeight')
+        
+        frames = common.get_frames(self.driver)    
+        filtered = []
+        for frame in frames:
+            if not frame:
+                filtered.append(frame)
+                continue
+                
+            if frame.location['x'] < 0 or frame.size['height'] <= 0 or frame.size['width'] <= 0:
+                continue
+            
+            if frame.location['y'] >= win_height - 2:
+                continue
+        
+            if frame.location['x'] >= win_width - 2:
+                continue  
+            
+            filtered.append(frame)
+            
+        return filtered
+
+    
     def try_switch_to_frame(self):
         try:
             if self.frames and self.f_idx < len(self.frames):
                 frame = self.frames[self.f_idx]
                 if frame:
+                    #self.frame_x, self.frame_y = selenium_controls.scroll_to_element(frame)
+                    self.frame_x = frame.location['x']
+                    self.frame_y = frame.location['y']
+                    print('switching to frame')
+                    print(frame.get_attribute('outerHTML'))
+                    print(self.frame_x, self.frame_y)
                     self.driver.switch_to.frame(self.frames[self.f_idx])
+                else:
+                    self.frame_x, self.frame_y = 0, 0
  
                 return True
         except:
+            traceback.print_exc()
             pass
         
         return False
@@ -307,6 +357,7 @@ class Environment:
     def try_switch_to_default(self):
         try:
             self.driver.switch_to.default_content()
+            self.frame_x, self.frame_y = 0, 0
             return True
         except:
             return False
