@@ -38,7 +38,7 @@ class Environment:
         assert self.rewards is not None
 
         return self.rewards.is_final()
-    
+            
 
     def start(self, url):
         self.try_quit_driver()
@@ -228,20 +228,35 @@ class Environment:
         return image
 
 
+    def get_frame_location(self):
+        if self.f_idx == 0:
+            return {'x': 0, 'y': 0}
+        else:
+            self.try_switch_to_default()
+            result = self.frames[self.f_idx].location
+            result['y'] -= common.get_scroll_top(self.driver)
+            self.try_switch_to_frame()
+            return result
+    
+    
     def get_screen_scale(self, ctrl):
         s = ctrl.size
-        ws = common.get_viewport_size(self.driver)
+        self.try_switch_to_default()
+        try:
+            ws = common.get_viewport_size(self.driver)
 
-        start_scale = self.width / self.crop_w
+            start_scale = self.width / self.crop_w
 
-        scale = max((s['width'] + 2.*self.crop_pad) / ws['width'] * start_scale, 
+            scale = max((s['width'] + 2.*self.crop_pad) / ws['width'] * start_scale, 
                     (s['height'] + 2.*self.crop_pad) / ws['height'] * start_scale)
 
-        scale = max(0.5, scale)
-        scale = min(start_scale, scale)
+            scale = max(0.5, scale)
+            scale = min(start_scale, scale)
 
-        return scale
-
+            return scale
+        finally:
+            self.try_switch_to_frame()
+    
     
     def get_control_as_input(self, ctrl):
         x, y = selenium_controls.scroll_to_element(self.driver, ctrl)
@@ -263,9 +278,11 @@ class Environment:
         scale = self.get_screen_scale(ctrl)
         image = self.get_screenshot_as_array(scale=scale)
         
+        frame_offset = self.get_frame_location()
+
         [h, w, _] = image.shape
-        top = y + self.frame_y
-        left = x +  self.frame_x
+        top = y + frame_offset['y']
+        left = x + frame_offset['x']
         bottom = top + ctrl.size['height']
         right = left + ctrl.size['width']
         
@@ -278,7 +295,7 @@ class Environment:
         left = max(left, 0)
         bottom = min(bottom, h)
         right = min(right, w)
-        
+                
         assert(bottom > top and right > left)
 
         if top > self.crop_pad:
@@ -336,15 +353,8 @@ class Environment:
             if self.frames and self.f_idx < len(self.frames):
                 frame = self.frames[self.f_idx]
                 if frame:
-                    #self.frame_x, self.frame_y = selenium_controls.scroll_to_element(frame)
-                    self.frame_x = frame.location['x']
-                    self.frame_y = frame.location['y']
-                    print('switching to frame')
-                    print(frame.get_attribute('outerHTML'))
-                    print(self.frame_x, self.frame_y)
+                    selenium_controls.scroll_to_element(self.driver, frame)
                     self.driver.switch_to.frame(self.frames[self.f_idx])
-                else:
-                    self.frame_x, self.frame_y = 0, 0
  
                 return True
         except:
@@ -357,7 +367,6 @@ class Environment:
     def try_switch_to_default(self):
         try:
             self.driver.switch_to.default_content()
-            self.frame_x, self.frame_y = 0, 0
             return True
         except:
             return False

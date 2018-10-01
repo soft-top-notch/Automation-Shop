@@ -353,8 +353,12 @@ def get_label_with_elem(element):
     placeholder = element.get_attribute('placeholder')
     if placeholder:
         return (placeholder, element)
+
     
-    return (parent.get_attribute("innerText"), parent)
+    if len(parent.find_elements_by_css_selector("*")) == 1:
+        return (parent.get_attribute("innerText"), parent)
+
+    return (None, element)
 
 
 def get_label(element):

@@ -86,7 +86,6 @@ class PopupRewardsCalculator(IRewardsCalculator):
             if covered >= 3:
                 return True
         
-        print('controls: {}, covered: {}'.format(len(controls), covered))
         return covered >= 3
     
     def get_domain(self, url):
