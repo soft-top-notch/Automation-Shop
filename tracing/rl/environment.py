@@ -38,7 +38,16 @@ class Environment:
         assert self.rewards is not None
 
         return self.rewards.is_final()
-            
+    
+    
+    def refresh_controls(self):
+        self.try_switch_to_default()
+        
+        self.controls = None
+        self.c_ids = 0
+        self.frames = None
+        self.f_idx = None
+        
 
     def start(self, url):
         self.try_quit_driver()
@@ -47,7 +56,6 @@ class Environment:
         self.c_idx = 0
         self.frames = None
         self.f_idx = 0
-        self.frame_x, self.frame_y = 0, 0
 
         try:
             self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))

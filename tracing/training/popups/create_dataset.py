@@ -28,7 +28,7 @@ def str_to_dataset_item(line):
     parts = line.split('\t')
     return {
        'url': parts[0],
-       'has_popup': parts[1],
+       'has_popup': parts[1] == 'True',
        'img_file': parts[2],
        'author': parts[3]
     }
@@ -174,9 +174,10 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
     return load_dataset(dataset_file)
 
 
-os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
-extracted_popup_urls = create_popup_dataset(dataset_file)
+if __name__ == '__main__':
+    os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
+    extracted_popup_urls = create_popup_dataset(dataset_file)
 
-print('processed urls: ', len(extracted_popup_urls))
+    print('processed urls: ', len(extracted_popup_urls))
 
 

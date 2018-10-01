@@ -61,7 +61,7 @@ urls = []
 with open(dataset_file) as f:
     for row in f:
         url, is_popup = row.strip().split('\t')
-        urls.append((url, is_popup == '1'))
+        urls.append((url, is_popup == 'True'))
 
 popup_urls = list([url for (url, is_popup) in urls if is_popup==True])
 random.shuffle(popup_urls)
