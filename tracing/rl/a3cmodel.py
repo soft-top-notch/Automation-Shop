@@ -112,10 +112,10 @@ class A3CModel:
                 # Policy
                 self.logits = slim.fully_connected(self.flat, self.num_actions, activation_fn=None)
 
-                self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
-                self.possible_logits = self.logits + tf.log(self.possible_proba)
+                #self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
+                #self.possible_logits = self.logits + tf.log(self.possible_proba)
 
-                self.pi = tf.nn.softmax(self.possible_logits)
+                self.pi = tf.nn.softmax(self.logits)
 
                 self.v = slim.fully_connected(tf.stop_gradient(self.flat), 1, activation_fn=None)
                 self.v = slim.flatten(self.v)
@@ -134,7 +134,7 @@ class A3CModel:
         # Batch x actions
         self.policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
              labels = self.performed_actions, 
-             logits = self.possible_logits)
+             logits = self.logits)
 
         # Batch
         self.policy_loss *= tf.stop_gradient(self.advantage)
@@ -148,6 +148,11 @@ class A3CModel:
         self.dist = (3 - tf.gather(self.rewards, size - 1)) / 3.0
         self.entropy_loss = self.dist * tf.reduce_mean(self.entropy_loss)
 
+        # Possible actions loss
+        self.possible_loss = (1-self.possible_actions) * self.pi * self.pi
+        self.possible_loss = tf.reduce_sum(self.possible_loss, -1)
+        self.possible_loss = 10*tf.reduce_mean(self.possible_loss)
+
         # Final Loss
         self.loss = self.policy_loss + self.value_loss + self.entropy_loss
            
@@ -155,7 +160,7 @@ class A3CModel:
     def add_train_op(self):
         self.opt = tf.train.GradientDescentOptimizer(self.lr, use_locking=False)
         
-        policy_train_op = self.opt.minimize(self.policy_loss + self.entropy_loss)
+        policy_train_op = self.opt.minimize(self.policy_loss + self.entropy_loss + self.possible_loss)
         value_train_op = self.opt.minimize(self.value_loss)
         
         self.train_op = tf.group(policy_train_op, value_train_op)

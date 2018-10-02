@@ -870,7 +870,7 @@ michiganmadevape.com	False	popups_dataset_imgs/3cfe5427-2a4d-4cde-a1dc-c879819cd
 har-d-vape.com	False	popups_dataset_imgs/e1f5c5f3-f1c6-4ad0-90b3-b9d25954ba27.png	heuristic
 funhousevapes.com	False	popups_dataset_imgs/1d3e840f-fc2f-423d-9cfe-d88249e3efdc.png	heuristic
 vapesmoker.co	False	popups_dataset_imgs/e43f6cfe-8a74-408b-9d66-e49a0bcbd0c1.png	heuristic
-chiefvapor.biz	True	popups_dataset_imgs/517d0406-ce4f-4a7d-aade-a4c6ce7ebdc0.png	heuristic
+chiefvapor.biz	False	popups_dataset_imgs/517d0406-ce4f-4a7d-aade-a4c6ce7ebdc0.png	aleksei
 atlantisvapes-com.myshopify.com	False	popups_dataset_imgs/fd0524eb-c088-4387-b25d-ca5e681bc69a.png	heuristic
 vaporpuff.net	False	popups_dataset_imgs/13e43e57-3c05-46d0-ba52-f3fa3f3f2fb2.png	heuristic
 tracyvapors.com	True	popups_dataset_imgs/0d684996-399f-4215-9fcf-4ce2a91f9df5.png	heuristic
@@ -3725,7 +3725,7 @@ vaporrealmecig.com	True	popups_dataset_imgs/bb53cab9-76eb-4a13-a37e-a5af9493db88
 ecgecigs.com	False	popups_dataset_imgs/9db25b2b-b332-470d-a3b8-40bfb3596901.png	heuristic
 catskillmountainvaporstore.com	False	popups_dataset_imgs/86940a7f-dd2f-4866-9660-215d1979e8ea.png	heuristic
 electroniccigarettesfast.com	False	popups_dataset_imgs/9798ff11-a2a3-4b13-a938-836010552ca5.png	heuristic
-westontobacco.com	True	popups_dataset_imgs/7dc67703-d3a2-4791-9e8a-060e640dc518.png	heuristic
+westontobacco.com	False	popups_dataset_imgs/7dc67703-d3a2-4791-9e8a-060e640dc518.png	aleksei
 usasweetashcigars.com	False	popups_dataset_imgs/7cbbb6f3-74d9-4d87-927f-f5dbd94b3ef5.png	heuristic
 gpandfamilycigars.com	False	popups_dataset_imgs/a42ed971-ba77-45ea-962c-4c9973bca62f.png	heuristic
 vapecliq.com	False	popups_dataset_imgs/82ca5c25-2504-40f5-b831-37eeebe1cc3e.png	heuristic
