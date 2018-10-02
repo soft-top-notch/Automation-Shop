@@ -18,7 +18,8 @@ class Environment:
                  headless = True,
                  crop_h = 300,
                  crop_w = 300,
-                 crop_pad = 5
+                 crop_pad = 5,
+                 max_passes = 3,
                 ):
         self.rewards = rewards
         self.user = user
@@ -30,24 +31,26 @@ class Environment:
         self.crop_w = crop_w
         self.screen_scale = None
         self.crop_pad = crop_pad
+        self.passes = 0
+        self.max_passes = max_passes
 
     def __enter__(self):
         pass
 
-    def is_final(self):
-        assert self.rewards is not None
 
-        return self.rewards.is_final()
-    
-    
-    def refresh_controls(self):
-        self.try_switch_to_default()
-        
-        self.controls = None
-        self.c_ids = 0
-        self.frames = None
-        self.f_idx = None
-        
+    def __exit__(self, type, value, traceback):
+        self.try_quit_driver()
+
+
+    def try_quit_driver(self):
+        try:
+            if self.driver is not None:
+                self.driver.quit()
+        except:
+            traceback.print_exc()
+
+        self.driver = None
+
 
     def start(self, url):
         self.try_quit_driver()
@@ -56,6 +59,8 @@ class Environment:
         self.c_idx = 0
         self.frames = None
         self.f_idx = 0
+        self.is_changed = False
+        self.passes = 0
 
         try:
             self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
@@ -83,18 +88,23 @@ class Environment:
             return False
 
     
-    def __exit__(self, type, value, traceback):
-        self.try_quit_driver()
+    def refresh_controls_if_needs(self):
+        if self.passes >= self.max_passes or self.is_final() or not self.is_changed:
+            return False
+           
+        self.try_switch_to_default()
 
+        self.is_changed = False
+        self.passes += 1
+        
+        self.controls = None
+        self.c_ids = 0
+        self.frames = None
+        self.f_idx = 0
 
-    def try_quit_driver(self):
-        try:
-            if self.driver is not None:
-                self.driver.quit()
-        except:
-            traceback.print_exc()
+        return True
+    
 
-        self.driver = None
 
     def get_next_frame(self, move = True):
         if move:
@@ -119,6 +129,8 @@ class Environment:
         
         
     def has_next_control(self):
+        self.refresh_controls_if_needs()
+        
         if self.frames is None:
             # First enter after start
             if not self.get_next_frame(move=False):
@@ -155,6 +167,12 @@ class Environment:
         
         return ctrl
 
+
+    def is_final(self):
+        assert self.rewards is not None
+
+        return self.rewards.is_final()
+    
 
     # Returns 3D Numpy array of image representation
     # Channels x Width X Height
@@ -322,7 +340,6 @@ class Environment:
     
     # Returns input images for different controls
     def get_controls(self):
-        
         controls = selenium_controls.extract_controls(self.driver)
 
         # Sort by Top then by Left of control location
@@ -367,9 +384,7 @@ class Environment:
                 return True
         except:
             traceback.print_exc()
-            pass
-        
-        return False
+            return False
 
     
     def try_switch_to_default(self):
@@ -392,6 +407,9 @@ class Environment:
             if self.rewards:
                  self.try_switch_to_frame()
             success = action.apply(control, self.driver, self.user)
+
+            # Control could dissapear track it as Environment Changed
+            self.is_changed = common.is_stale(control.elem)
         except:
             success = False
             traceback.print_exc()
@@ -405,7 +423,7 @@ class Environment:
             
         return self.rewards.calc_reward(success) if self.rewards else None
     
+    
     def calc_final_reward(self):
         assert self.rewards is not None
-
         return self.rewards.calc_final_reward()
