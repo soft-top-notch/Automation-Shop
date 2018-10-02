@@ -53,6 +53,7 @@ class Environment:
 
 
     def start(self, url):
+        self.url = url
         self.try_quit_driver()
         self.step = 0
         self.controls = None
@@ -135,6 +136,9 @@ class Environment:
             # First enter after start
             if not self.get_next_frame(move=False):
                 return False
+
+        if self.f_idx >= len(self.frames):
+            return False
 
         # Extract controls from every frame
         while True:
@@ -259,6 +263,9 @@ class Environment:
             return {'x': 0, 'y': 0}
         else:
             self.try_switch_to_default()
+            if self.f_idx >= len(self.frames):
+                print('frames: {}, f_idx: {}, url: {}'.format(len(self.frames), self.f_idx, self.url))
+
             result = self.frames[self.f_idx].location
             result['y'] -= common.get_scroll_top(self.driver)
             self.try_switch_to_frame()
@@ -384,7 +391,8 @@ class Environment:
                 return True
         except:
             traceback.print_exc()
-            return False
+        
+        return False
 
     
     def try_switch_to_default(self):
@@ -416,7 +424,7 @@ class Environment:
 
         finally:
             if self.rewards:
-                self.try_switch_to_default()       
+                self.try_switch_to_default()
 
                 self.rewards.after_action(self.driver, action)
                 self.try_switch_to_frame()

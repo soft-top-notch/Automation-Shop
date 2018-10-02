@@ -2,6 +2,7 @@ import random
 import threading
 from tracing.rl.a3cmodel import A3CModel
 from tracing.rl.actions import *
+import traceback
 
 
 class ActionsMemory:
@@ -173,6 +174,7 @@ class ActorLearnerWorker(threading.Thread):
                 print('got action:', action)
                         
                 reward = self.env.apply_action(ctrl, action)
+
                 print('reward:', reward)
                 
                 memory.append(inp, action_id, reward, ctrl)
@@ -181,15 +183,16 @@ class ActorLearnerWorker(threading.Thread):
                 if memory.size() % self.n_step == 0:
                     break             
 
-
             is_final = self.env.is_final() or not self.env.has_next_control()
-            
+
             if is_final:
                 v_score = self.env.calc_final_reward()
             else:
                 # Find next element
                 ctrl = self.env.get_next_control(move=False)
+
                 inp = self.env.get_control_as_input(ctrl)
+
                 v_score = self.local_model.estimate_score(inp) * self.gamma
 
             memory.set_final_score(v_score)
@@ -222,6 +225,9 @@ class ActorLearnerWorker(threading.Thread):
                 print('\n\nstarted url', 'http://' + url)
                 if not self.env.start(url):
                     continue
-
-                self.act_and_learn(url)
                 
+                try:
+                    self.act_and_learn(url)
+                except:
+                    print('exception during processing url: {}'.format(url))
+                    traceback.print_exc()
