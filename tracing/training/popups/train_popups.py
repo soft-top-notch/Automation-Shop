@@ -10,6 +10,8 @@ import csv, re
 import random
 import os
 
+from create_dataset import load_dataset
+
 
 os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
 
@@ -57,19 +59,18 @@ no_popup_urls = [
 
 assert os.path.isfile(dataset_file), 'Dataset file {} is not exists'.format(dataset_file)
 
-urls = []
-with open(dataset_file) as f:
-    for row in f:
-        url, is_popup = row.strip().split('\t')
-        urls.append((url, is_popup == 'True'))
 
-popup_urls = list([url for (url, is_popup) in urls if is_popup==True])
+urls = load_dataset(dataset_file)
+
+popup_urls = list([status['url'] for status in urls if status['has_popup']==True])
 random.shuffle(popup_urls)
 
 split = int(len(popup_urls) * 0.8)
 train_urls = popup_urls[:split]
 test_urls = popup_urls[split:]
 
+print('train size: ', len(train_urls))
+print('test size: ', len(test_urls))
 
 tf.reset_default_graph()
 session = tf.Session()
