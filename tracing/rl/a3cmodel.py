@@ -15,7 +15,8 @@ class A3CModel:
     def __init__(self, num_actions, 
                  global_model = None, 
                  session = None,
-                 train_deep = True
+                 train_deep = True,
+                 rnn_size = 100
                  ):
         
         self.num_actions = num_actions
@@ -88,7 +89,7 @@ class A3CModel:
         he_init = tf.contrib.layers.variance_scaling_initializer(mode="FAN_AVG")
         xavier_init = tf.contrib.layers.xavier_initializer()
         zero_init = tf.constant_initializer(0)
-        
+
         with slim.arg_scope(inception_resnet_v2_arg_scope(batch_norm_updates_collections=[])):
             self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(self.img, None, dropout_keep_prob = 1.0, is_training = False)
 
@@ -141,7 +142,10 @@ class A3CModel:
         self.policy_loss = tf.reduce_mean(self.policy_loss)
         
         # Entropy: H(pi)  (regularization)
-        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels = tf.nn.softmax(self.logits), logits = self.logits)
+        filtered_logits = self.possible_actions * self.logits
+        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+              labels = tf.nn.softmax(filtered_logits), 
+              logits = filtered_logits)
         # Batch
         self.entropy_loss = -self.er * tf.reduce_sum(entropy, axis = -1)
         size = tf.shape(self.rewards)[0]
@@ -155,7 +159,7 @@ class A3CModel:
 
         # Final Loss
         self.loss = self.policy_loss + self.value_loss + self.entropy_loss
-           
+        
 
     def add_train_op(self):
         self.opt = tf.train.GradientDescentOptimizer(self.lr, use_locking=False)

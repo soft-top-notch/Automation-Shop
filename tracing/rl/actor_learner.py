@@ -213,6 +213,7 @@ class ActorLearnerWorker(threading.Thread):
                 print('sum_reward for {} is {}'.format(url, sum_reward))
                 return sum_reward
 
+        print('sum_reward for {} is {} how we entered here?'.format(url, sum_reward))        
         return sum_reward
                 
 
