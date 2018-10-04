@@ -3,9 +3,10 @@ import traceback
 from abc import abstractmethod
 import requests
 import selenium
-from common_heuristics import *
-from selenium_utils.common import *
-from status import *
+
+from tracing.common_heuristics import *
+from tracing.selenium_utils.common import *
+from tracing.status import *
 
 
 class States:

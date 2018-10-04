@@ -5,17 +5,18 @@ import time
 import calendar
 import csv
 
-from tracing.nlp import *
-from tracing.shop_tracer import *
-from tracing.selenium_helper import *
-from tracing.common_heuristics import *
-
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import ElementNotVisibleException, TimeoutException, StaleElementReferenceException, NoSuchElementException
+
+from tracing.nlp import *
+from tracing.shop_tracer import *
+from tracing.selenium_utils.common import *
+from tracing.selenium_utils.controls import *
+from tracing.common_heuristics import *
 
 
 class ToProductPageLink(IStepActor):

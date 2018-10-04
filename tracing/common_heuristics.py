@@ -1,5 +1,3 @@
-from selenium_utils.common import *
-from selenium_utils.controls import *
 import nlp
 import time
 import logging
@@ -7,6 +5,10 @@ import random
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
+
+from tracing.selenium_utils.common import *
+from tracing.selenium_utils.controls import *
+
 
 def get_label_text_with_attribute(driver, elem):
     label_text = ""
@@ -29,6 +31,7 @@ def get_label_text_with_attribute(driver, elem):
         pass
 
     return label_text
+
 
 def find_radio_or_checkbox_buttons(driver,
                                   contains=None,
@@ -57,24 +60,13 @@ def find_elements_with_attribute(driver,
     return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
 
-def is_link(driver, elem):
-    current_url = normalize_url(get_url(driver))
-    
-    try:
-        href = elem.get_attribute('href')
-        href = normalize_url(href)
-        return href and not href.startswith('javascript:') and href != current_url
-    except:
-        logger = logging.getLogger('shop_tracer')
-        logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
-        return False
-
-
 def find_links(driver, contains=None, not_contains=None):
     result = []
 
     for link in get_links(driver):
         if not can_click(link):
+            continue
+            
         if get_url(driver) == link.get_attribute("href"):
             continue
 
