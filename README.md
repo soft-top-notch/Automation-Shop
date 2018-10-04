@@ -6,6 +6,21 @@ Navigation and checkout page filling is heuristic based.
 #### Installation
 pip install -I trace_automation
 
+### Deploy in Test Environment
+
+Clone retrace_automation repo in trace_automation's parent folder
+```shell
+git clone https://github.com/g2webservices/retrace_automation
+```
+
+1. Start RabbitMQ listening to localhost
+2. Start MongoDB listening localhost
+3. Run docker
+```shell
+cd docker
+sudo docker-compose up
+```
+
 #### Mock Data Service
 
 First we need to start data service with mock user data

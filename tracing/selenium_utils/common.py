@@ -23,16 +23,47 @@ class Frame:
     def __enter__(self):
         if self.frame:
             self.driver.switch_to.frame(self.frame)
-            self.url = self.driver.current_url
+            self.url = normalize_url(get_url(self.driver))
+        
+        self.driver.active_frame = self
 
-    def __exit__(self, type, value, traceback):
+    def is_need_to_exit(self):
         if self.frame:
-            url = self.driver.current_url
+            url = normalize_url(get_url(self.driver))
             
-            # ToDo Do checks without ancors
             if url == self.url: #and not is_stale(self.frame):
                 self.driver.switch_to.default_content()
 
+            return url == self.url and not is_stale(self.frame)
+         
+        return False
+    
+    def __exit__(self, type, value, traceback):
+        if self.is_need_to_exit():
+            self.driver.switch_to.default_content()
+        
+        self.driver.active_frame = None
+
+
+def normalize_url(url):
+    if not url:
+        return url
+    
+    return url[:url.index('#')] if '#' in url else url
+
+
+def get_url(driver, attempts = 2):
+    try:
+        return driver.current_url
+    except UnexpectedAlertPresentException:
+        if attempts > 1:
+            close_alert_if_appeared(driver)
+            return get_url(driver, attempts - 1)
+        else:
+            return None
+    except:
+        return None
+    
 
 def is_stale(elem):
     try:
@@ -131,6 +162,65 @@ def get_element_attribute(element):
     return None
 
 
+def get_name_of_state(state):
+    us_state_abbrev = {
+        'AL': 'Alabama',
+        'AK': 'Alaska',
+        'AZ': 'Arizona',
+        'AR': 'Arkansas',
+        'CA': 'California',
+        'CO': 'Colorado',
+        'CT': 'Connecticut',
+        'DE': 'Delaware',
+        'FL': 'Florida',
+        'GA': 'Georgia',
+        'HI': 'Hawaii',
+        'ID': 'Idaho',
+        'IL': 'Illinois',
+        'IN': 'Indiana',
+        'IA': 'Iowa',
+        'KS': 'Kansas',
+        'KY': 'Kentucky',
+        'LA': 'Louisiana',
+        'ME': 'Maine',
+        'MD': 'Maryland',
+        'MA': 'Massachusetts',
+        'MI': 'Michigan',
+        'MN': 'Minnesota',
+        'MS': 'Mississippi',
+        'MO': 'Missouri',
+        'MT': 'Montana',
+        'NE': 'Nebraska',
+        'NV': 'Nevada',
+        'NH': 'New Hampshire',
+        'NJ': 'New Jersey',
+        'NM': 'New Mexico',
+        'NY': 'New York',
+        'NC': 'North Carolina',
+        'ND': 'North Dakota',
+        'OH': 'Ohio',
+        'OK': 'Oklahoma',
+        'OR': 'Oregon',
+        'PA': 'Pennsylvania',
+        'RI': 'Rhode Island',
+        'SC': 'South Carolina',
+        'SD': 'South Dakota',
+        'TN': 'Tennessee',
+        'TX': 'Texas',
+        'UT': 'Utah',
+        'VT': 'Vermont',
+        'VA': 'Virginia',
+        'WA': 'Washington',
+        'WV': 'West Virginia',
+        'WI': 'Wisconsin',
+        'WY': 'Wyoming',
+    }
+
+    if state == 'DC':
+        state = 'DE'
+    return us_state_abbrev[state]
+
+
 def create_chrome_driver(chrome_path='/usr/bin/chromedriver', headless=True, size = None):
     """
     Creates Chrome Web driver
@@ -142,6 +232,9 @@ def create_chrome_driver(chrome_path='/usr/bin/chromedriver', headless=True, siz
     options = webdriver.ChromeOptions()
     if headless:
         options.add_argument('--headless')
+    
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
 
     options.add_argument("--disable-infobars")
     options.add_argument("--disable-extensions")
@@ -287,14 +380,18 @@ def enter_text(driver, x, y, text):
     driver.execute_script('el = document.elementFromPoint({}, {}); el.value = "{}";'.format(x, y, text))
 
 
-def get_full_page_screenshot(driver, output_file, scale):
+def get_full_page_screenshot(driver, output_file, scale, max_pages = 10):
     """
     Takes correct screenshot with scrolls and dynamic content
     :param driver:       Web driver
     :param output_file:  File to save screenshot
     :param scale:        Screenshot width / page width
                          Should be calculated using method get_scale(driver)
+    :param max_pages:    Maximum pages to scroll (could be usefull for the infinite page). 
+                         If max_pages < 0 then scrolls till the end or infinite time.
+                         
     """
+       
     screens = []
         
     def save_screenshot():        
@@ -306,14 +403,17 @@ def get_full_page_screenshot(driver, output_file, scale):
         return path
     
     try:
-        scroll_to_top(driver)
+        if hasattr(driver, 'active_frame') and driver.active_frame and driver.active_frame.is_need_to_exit():
+            driver.switch_to_default_content()
 
+        scroll_to_top(driver)
+        
         # take screenshots
         height = get_window_height(driver)
         scrolled = height
         save_screenshot()
         
-        while scrolled < get_page_height(driver):
+        while scrolled < get_page_height(driver) and (max_pages < 0 or len(screens) < max_pages):
             scroll(driver, 0, height)
             time.sleep(0.1)
             save_screenshot()
@@ -323,35 +423,41 @@ def get_full_page_screenshot(driver, output_file, scale):
         # stitch images together
         stiched = None
         
+        y = 0
         for i, screen in enumerate(screens):
             img = Image.open(screen)
              
             w, h = img.size
-            y = i * height * scale
-             
             if i == len(screens) - 1:
-                w = w * scale
-                h = h * scale  
                 img = img.crop((0, h-(round(scale * scrolled)) % h, w, h))
                 w, h = img.size
             
+            if h == 0 or w == 0:
+                continue
+                
             if stiched is None:
                 stiched = Image.new('RGB', (w, round(scrolled * scale)))
-             
+            
             stiched.paste(img, (
                 0, # x0
-                round(y), # y0
+                y, # y0
                 w, # x1
-                round(y + h) # y1
+                y + h # y1
             ))
-            
-        stiched.save(output_file)
+            y = y + h
+        
+        if stiched:
+            stiched.save(output_file)
         
     finally:
         # cleanup
         for screen in screens:
             if os.path.isfile(screen):
                 os.remove(screen)
+        
+        if hasattr(driver, 'active_frame') and driver.active_frame and driver.active_frame.is_need_to_exit():
+            driver.switch_to.frame(driver.active_frame.frame)
+        
  
     return output_file
 

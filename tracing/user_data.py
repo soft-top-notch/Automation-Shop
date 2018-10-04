@@ -11,7 +11,9 @@ class UserInfo:
                  state,
                  country,
                  phone,
-                 email
+                 email,
+                 password,
+                 company
                  ):
         self.first_name = first_name
         self.last_name = last_name
@@ -23,11 +25,14 @@ class UserInfo:
         self.country = country
         self.phone = phone
         self.email = email
+        self.password = password
+        self.company = company
 
     def get_json_userinfo(self):
         return {
             "first name": self.first_name,
             "last name": self.last_name,
+            "full name": self.first_name + " " + self.last_name,
             "country": self.country,
             "state": self.state,
             "home": self.home,
@@ -36,6 +41,8 @@ class UserInfo:
             "city": self.city,
             "phone": self.phone,
             "email": self.email,
+            "password": self.password,
+            "company": self.company,
         }
 
 
@@ -46,7 +53,8 @@ class PaymentInfo:
                  card_type,
                  expire_date_year,
                  expire_date_month,
-                 cvc
+                 cvc,
+                 zip
                  ):
         self.card_number = card_number
         self.card_name = card_name
@@ -54,13 +62,17 @@ class PaymentInfo:
         self.expire_date_year = expire_date_year
         self.expire_date_month = expire_date_month
         self.cvc = cvc
+        self.zip = zip
 
     def get_json_paymentinfo(self):
         return {
             "number": self.card_number,
             "name": self.card_name,
             "type": self.card_type,
+            "expdate": self.expire_date_month + self.expire_date_year,
+            "birthdate": self.expire_date_month + "0119" + self.expire_date_year,
             "cvc": self.cvc,
+            "zip": self.zip
         }
 
 
@@ -71,6 +83,8 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
     address = data['Street:'].split(' ')
     home = address[0]
     street = " ".join(address[1:])
+    password = "Payment123"
+    company = "ULTC"
 
     user_info = UserInfo(
         data['First Name:'],
@@ -82,7 +96,9 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
         data['State:'],
         data['Country'],
         data['Phone:'],
-        data['E-mail:']
+        data['E-mail:'],
+        password,
+        company
     )
 
     month, year = data['CC exp. date:'].split('/')
@@ -90,9 +106,10 @@ def get_user_data(url = 'http://127.0.0.1:8989/json'):
         data['CC Number:'],
         user_info.first_name + " " + user_info.last_name,
         data['CC provider:'],
-        int(year),
-        int(month),
-        data['CC CVV']
+        year,
+        month,
+        data['CC CVV'],
+        data['Zip code:']
     )
 
     return user_info, payment_info

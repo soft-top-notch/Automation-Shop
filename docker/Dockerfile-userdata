@@ -1,0 +1,19 @@
+FROM ubuntu:18.04
+
+ENV DEBIAN_FRONTEND noninteractive
+ENV RETRACE_PATH "retrace_automation"
+
+
+# Update
+RUN apt-get update
+
+# Python, setuptools
+RUN apt-get install -y python-dev python-setuptools python-pip
+
+# Install PyPI dependencies
+RUN pip2 install falcon ujson faker barnum gunicorn
+
+ADD $RETRACE_PATH /code
+WORKDIR /code/backend
+CMD gunicorn -b 127.0.0.1:8989 r_service:api
+

@@ -1,0 +1,31 @@
+version: '3'
+services:
+  userdata:
+    build:
+      # Suppose that retrace automation is cloned in the same folder as trace_automation
+      context: ../..
+      dockerfile: trace_automation/docker/Dockerfile-userdata
+    expose: 
+     - "8989"
+    network_mode: host
+     
+  tracer:
+    build: 
+       context: ..
+       dockerfile: docker/Dockerfile
+    volumes:
+     - ..:/code
+    ports:
+     - "8989:8989"
+    deploy:
+      mode: replicated
+      replicas: 2
+    environment:
+     - MONGO_HOST=${MONGO_HOST}
+     - RABBIT_HOST=${RABBIT_HOST}
+#    Uncomment if network_mode: bridge
+#    links:  
+#      - userdata
+    depends_on:
+      - userdata
+    network_mode: host

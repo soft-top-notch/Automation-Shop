@@ -185,7 +185,7 @@ session.run(tf.global_variables_initializer())
 a3cmodel.init_from_checkpoint('inception_resnet_v2_2016_08_30.ckpt')
 
 
-for epoch in range(10):
+for epoch in range(60):
     print('epoch ', epoch)
     classifier.train(train_urls, epochs=1)
     train_f1 = measure(classifier, train_urls)

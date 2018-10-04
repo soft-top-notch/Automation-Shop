@@ -38,7 +38,7 @@ def check_text(text, contains, not_contains=None, normalize=True):
     return not has_forbidden
 
 
-def remove_elements(text, contains):
+def remove_letters(text, contains):
     strName = text
     for elem in contains:
         strName=strName.replace(elem, "")
