@@ -89,6 +89,15 @@ def can_click(element):
         return False
 
 
+def click_radio_or_checkout_button(driver, element):
+    try:
+        element.send_keys(selenium.webdriver.common.keys.Keys.SPACE)
+    except:
+        driver.execute_script("arguments[0].click();", element)
+        pass
+    time.sleep(1)
+
+
 def find_alert(driver):    
     return alert_is_present()(driver)
 
