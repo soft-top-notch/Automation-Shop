@@ -109,6 +109,7 @@ class UrlPopupsChecker:
                 continue
 
         img_file = self.get_img_file()
+        common.scroll_to_top(self.driver)
         common.get_screenshot(self.driver, img_file)
         return {
             'url': url,

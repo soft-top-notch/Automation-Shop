@@ -158,6 +158,8 @@ class ActorLearnerWorker(threading.Thread):
     def act_and_learn(self, url):
         sum_reward = 0
         memories = []
+        lstm_state = None
+        state_to_train = None
         while True:
             memory = ActionsMemory(gamma = self.gamma)
             memories.append(memory)
@@ -168,7 +170,7 @@ class ActorLearnerWorker(threading.Thread):
 
                 print('control:', str(ctrl)[:100])
                 pa = ActionsMemory.get_possible_actions(ctrl)
-                action_id = self.local_model.get_action(inp, pa)
+                action_id, lstm_state = self.local_model.get_action(inp, pa, lstm_state, True)
 
                 action = Actions.actions[action_id]
                 print('got action:', action)
@@ -193,16 +195,18 @@ class ActorLearnerWorker(threading.Thread):
 
                 inp = self.env.get_control_as_input(ctrl)
 
-                v_score = self.local_model.estimate_score(inp) * self.gamma
+                v_score = self.local_model.estimate_score(inp, lstm_state) * self.gamma
 
             memory.set_final_score(v_score)
-                    
+            
             losses = self.local_model.train_from_memory(memory, 
                                                                 dropout = self.dropout, 
                                                                 lr = self.get_lr(),
                                                                 er = self.entropy_l,
-                                                                l2 = self.l2
+                                                                l2 = self.l2,
+                                                                lstm_state = state_to_train
                                                                )
+            state_to_train = lstm_state
             print('policy_loss: {}, value_loss: {}, entropy_loss: {}'.format(losses[0], losses[1], losses[2]))
                     
             if is_final:

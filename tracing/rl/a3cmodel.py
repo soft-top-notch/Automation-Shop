@@ -26,6 +26,7 @@ class A3CModel:
         self.saver = None
         
         self.train_deep = train_deep
+        self.rnn_size = rnn_size
         
         self.build()
         
@@ -56,12 +57,15 @@ class A3CModel:
         if self.session is None:
             self.session = tf.Session()
         
-        self.build_graph()
+        self.build_inputs()
+        self.build_cnn()
+        self.build_lstm()
+        self.build_a3c()
         self.add_loss()
         self.add_train_op()
-            
     
-    def build_graph(self):
+
+    def build_inputs(self):
         with tf.variable_scope('inputs') as sc:
             # Batch x h x 612
             self.img = tf.placeholder(tf.float32, (None, 300, 300, 3), "img")
@@ -85,14 +89,38 @@ class A3CModel:
             # Batch x num_actions
             self.possible_actions = tf.placeholder(tf.float32, (None, self.num_actions), 'possible_actions')
 
+
+    def build_lstm(self):
+        self.lstm = tf.nn.rnn_cell.LSTMCell(self.rnn_size, state_is_tuple=False)
+        self.lstm_init_state = self.lstm.zero_state(1, dtype=tf.float32)
+        
+        actions_repr = tf.one_hot(self.performed_actions, self.num_actions)
+        img_repr = slim.fully_connected(self.net, 100)
+
+        rnn_input = tf.stack([actions_repr, img_repr], -1)
+        
+        self.state, self.rnn_output = self.rnn = tf.nn.dynamic_rnn(
+            self.lstm, rnn_input, initial_state = self.lstm_init_state)
+        self.rnn_out = slim.flatten(slim.fully_connected(self.rnn_output, 100))
+    
+    
+    def build_cnn(self):
+        with slim.arg_scope(inception_resnet_v2_arg_scope(batch_norm_updates_collections=[])):
+            self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(
+                   self.img, None, dropout_keep_prob = 1.0, is_training = False)
+            # Batch x Channels
+            self.net = slim.flatten(self.net)
+                
+            if not self.train_deep:
+               self.net = tf.stop_gradient(self.net)
+
+
+
+    def build_a3c(self):
         l2_reg = slim.l2_regularizer(self.l2)
         he_init = tf.contrib.layers.variance_scaling_initializer(mode="FAN_AVG")
         xavier_init = tf.contrib.layers.xavier_initializer()
         zero_init = tf.constant_initializer(0)
-
-        with slim.arg_scope(inception_resnet_v2_arg_scope(batch_norm_updates_collections=[])):
-            self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(self.img, None, dropout_keep_prob = 1.0, is_training = False)
-
 
         with tf.variable_scope('cnn') as sc:
             with slim.arg_scope([slim.conv2d, slim.fully_connected],
@@ -101,24 +129,24 @@ class A3CModel:
                                   weights_regularizer = l2_reg
                                 ):
                 
-                # Batch x Channels
-                self.net = slim.flatten(self.net)
-                
-                if not self.train_deep:
-                    self.net = tf.stop_gradient(self.net)
-
+               
                 self.fc2 = slim.fully_connected(self.net, 100)
-                self.flat = slim.dropout(self.fc2, self.dropout, scope='dropout')
+
+                self.policy_input = tf.concat([self.fc2, self.rnn_out], -1)
+
+                self.policy_input = slim.dropout(self.policy_input, self.dropout, scope='dropout')
 
                 # Policy
-                self.logits = slim.fully_connected(self.flat, self.num_actions, activation_fn=None)
-
-                #self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
-                #self.possible_logits = self.logits + tf.log(self.possible_proba)
-
+                self.logits = slim.fully_connected(self.policy_input, self.num_actions, activation_fn=None)
                 self.pi = tf.nn.softmax(self.logits)
 
-                self.v = slim.fully_connected(tf.stop_gradient(self.flat), 1, activation_fn=None)
+                # Policy with Prior knowledge of possible actions
+                self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
+                self.prior_logits = self.logits + tf.log(self.possible_proba)
+                self.prior_pi = tf.nn.softmax(self.prior_logits)
+
+                # Critic
+                self.v = slim.fully_connected(self.policy_input, 1, activation_fn=None)
                 self.v = slim.flatten(self.v)
 
                                 
@@ -142,12 +170,15 @@ class A3CModel:
         self.policy_loss = tf.reduce_mean(self.policy_loss)
         
         # Entropy: H(pi)  (regularization)
+        # Take into account only possible actions
         filtered_logits = self.possible_actions * self.logits
         entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
               labels = tf.nn.softmax(filtered_logits), 
-              logits = filtered_logits)
-        # Batch
+              logits = filtered_logits)# * self.possible_actions
+
         self.entropy_loss = -self.er * tf.reduce_sum(entropy, axis = -1)
+
+        # If the goal (reward 3 is harcoded so far) is reached - then don't use entropy 
         size = tf.shape(self.rewards)[0]
         self.dist = (3 - tf.gather(self.rewards, size - 1)) / 3.0
         self.entropy_loss = self.dist * tf.reduce_mean(self.entropy_loss)
@@ -170,54 +201,54 @@ class A3CModel:
         self.train_op = tf.group(policy_train_op, value_train_op)
         
 
-    def get_action(self, image, possible_actions):
+
+    def get_action(self, image, possible_actions, lstm_state = None, return_next_state = False):
         """
         Returns Action Id
         """
+        if lstm_state is None:
+           lstm_state = np.zeros((1, 2*self.rnn_size))
+
         feed_dict = {
             self.img: [image],
-            self.possible_actions: [possible_actions], 
+            self.possible_actions: [possible_actions],
+            self.lstm_init_state: lstm_state,
             self.dropout: 1.0
         }
-        pi = self.session.run(self.pi, feed_dict = feed_dict)
+        pi, new_lstm_state = self.session.run([self.prior_pi, self.state], feed_dict = feed_dict)
         pi = np.squeeze(pi)
         print('got probabilities:', pi)
-        return np.random.choice(range(self.num_actions), p = pi)
+
+        action_id = np.random.choice(range(self.num_actions), p = pi)
+        
+        if return_next_state:
+           return(action_id, new_lstm_state)
+        else:
+           return action_id
     
 
-    def estimate_score(self, image):
+    def estimate_score(self, image, lstm_state = None):
         """
         Returns Score Estimation
         """
+        if lstm_state is None:
+           lstm_state = np.zeros((1, 2*self.rnn_size))
+
+        feed_dict = {
+            self.img: [image], 
+            self.lstm_init_state: lstm_state,
+            self.dropout: 1.0
+        }
         v = self.session.run(self.v, feed_dict = {self.img: [image], self.dropout: 1.0})
         print('got score:', v)
         return v
-
-
-    def train_from_memory_cv(self, memory, dropout = 1.0, lr = 0.01, er = 0.01):
-        assert not self.is_global, "Can't train Global Model"
-        
-        batch = memory.to_input()
-        batch_size = len(batch['img'])
-        if batch_size <= 0:
-            return 0
-
-        feed_data = {
-            self.img: batch['img'],
-            self.possible_actions: batch['possible_actions'],
-
-            self.dropout: dropout,
-            self.lr: lr
-        }
-        
-        loss = self.update_global_cv(feed_data)
-        self.pull_global()
-        
-        return loss
        
     
-    def train_from_memory(self, memory, dropout = 1.0, lr = 0.01, er = 0.01, l2 = 0.01):
+    def train_from_memory(self, memory, dropout = 1.0, lr = 0.01, er = 0.01, l2 = 0.01, lstm_state = None):
         
+        if lstm_state is None:
+           lstm_state = np.zeros((1, 2*self.rnn_size))
+
         # 1. Convert Memory to Input Batch
         batch = memory.to_input()
         batch_size = len(batch['img'])
@@ -235,7 +266,8 @@ class A3CModel:
             self.dropout: dropout,
             self.lr: lr,
             self.er: er,
-            self.l2: l2
+            self.l2: l2,
+            self.lstm_init_state: lstm_state
         } 
         
         _, policy_loss, value_loss, entropy_loss = self.session.run(
