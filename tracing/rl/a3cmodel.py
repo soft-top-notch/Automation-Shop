@@ -84,6 +84,9 @@ class A3CModel:
             
             # Batch, Number of Action
             self.performed_actions = tf.placeholder(tf.int32, (None), "performed_actions")
+
+            # Actions that was done in the previous step
+            self.prev_actions = tf.placeholder(tf.int32, (None), "prev_acitons")
             
             # Batch
             self.rewards = tf.placeholder(tf.float32, (None), 'rewards')
@@ -96,7 +99,7 @@ class A3CModel:
         self.lstm_cell = tf.nn.rnn_cell.LSTMCell(self.rnn_size, state_is_tuple=True)
         self.lstm_init_state = self.lstm_cell.zero_state(1, dtype=tf.float32)
         
-        actions_repr = tf.one_hot(self.performed_actions, self.num_actions)
+        actions_repr = tf.one_hot(self.prev_actions, self.num_actions)
         actions_repr = tf.cast(actions_repr, dtype=tf.float32)
         img_repr = slim.fully_connected(self.net, 100)
         
@@ -224,21 +227,20 @@ class A3CModel:
             feed_dict[self.lstm_init_state.c] = lstm_state.c
 
 
-    def get_action(self, image, possible_actions, lstm_state = None, return_next_state = False):
+    def get_action(self, image, possible_actions, prev_action, lstm_state = None, return_next_state = False):
         """
         Returns Action Id
         """
         feed_dict = {
             self.img: [image],
             self.possible_actions: [possible_actions],
-            self.performed_actions: [0],
-            self.dropout: 1.0,
-            self.move_rnn: False
+            self.prev_actions: [prev_action],
+            self.dropout: 1.0
         }
         
         self.add_lstm_state(feed_dict, lstm_state)
         
-        pi = self.session.run(self.prior_pi, feed_dict = feed_dict)
+        pi, new_lstm_state = self.session.run([self.prior_pi, self.state], feed_dict = feed_dict)
         pi = np.squeeze(pi)
         print('got probabilities:', pi)
 
@@ -246,29 +248,23 @@ class A3CModel:
         
         # move state
         if return_next_state:
-            feed_dict[self.performed_actions] = [action_id]
-            feed_dict[self.move_rnn] = True
-            
-            new_lstm_state = self.session.run(self.state, feed_dict = feed_dict)
             return(action_id, new_lstm_state)
         else:
             return action_id
     
 
-    def estimate_score(self, image, lstm_state = None):
+    def estimate_score(self, image, prev_action, lstm_state = None):
         """
         Returns Score Estimation
         """
         feed_dict = {
             self.img: [image], 
-            self.performed_actions: [0],            
-            self.dropout: 1.0,
-            self.move_rnn: False
+            self.prev_actions: [prev_action],            
+            self.dropout: 1.0
         }
         self.add_lstm_state(feed_dict, lstm_state)
-
         
-        v = self.session.run(self.v, feed_dict = {self.img: [image], self.dropout: 1.0})
+        v = self.session.run(self.v, feed_dict = feed_dict)
         print('got score:', v)
         return v
                    
@@ -283,9 +279,12 @@ class A3CModel:
             return (0, 0, 0)
         
         # 2. Create Feed Data
+        prev_actions = [memory.prev_action] + batch['actions'][:-1]
         feed_dict = {
             self.img: batch['img'],
             self.performed_actions: batch['actions'],
+            self.prev_actions: prev_actions,
+
             self.rewards: batch['rewards'],
             self.possible_actions: batch['possible_actions'],
 

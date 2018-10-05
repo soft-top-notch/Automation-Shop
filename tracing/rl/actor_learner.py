@@ -6,11 +6,12 @@ import traceback
 
 
 class ActionsMemory:
-    def __init__(self, gamma):
+    def __init__(self, gamma, prev_action):
         self.imgs = []
         self.actions = []
         self.rewards = []
         self.gamma = gamma
+        self.prev_action = prev_action
         self.final_score = 0
         self.possible_actions = []
     
@@ -160,8 +161,10 @@ class ActorLearnerWorker(threading.Thread):
         memories = []
         lstm_state = None
         state_to_train = None
+
+        action_id = len(Actions.actions) - 1
         while True:
-            memory = ActionsMemory(gamma = self.gamma)
+            memory = ActionsMemory(self.gamma, action_id)
             memories.append(memory)
             
             while not self.env.is_final() and self.env.has_next_control():
@@ -170,7 +173,7 @@ class ActorLearnerWorker(threading.Thread):
 
                 print('control:', str(ctrl)[:100])
                 pa = ActionsMemory.get_possible_actions(ctrl)
-                action_id, lstm_state = self.local_model.get_action(inp, pa, lstm_state, True)
+                action_id, lstm_state = self.local_model.get_action(inp, pa, action_id, lstm_state, True)
 
                 action = Actions.actions[action_id]
                 print('got action:', action)
@@ -192,10 +195,9 @@ class ActorLearnerWorker(threading.Thread):
             else:
                 # Find next element
                 ctrl = self.env.get_next_control(move=False)
-
                 inp = self.env.get_control_as_input(ctrl)
 
-                v_score = self.local_model.estimate_score(inp, lstm_state) * self.gamma
+                v_score = self.local_model.estimate_score(inp, action_id, lstm_state) * self.gamma
 
             memory.set_final_score(v_score)
             
