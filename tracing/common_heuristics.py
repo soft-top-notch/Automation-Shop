@@ -2,9 +2,12 @@ import nlp
 import time
 import logging
 import random
+import sys
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
+
+sys.path.insert(0, '..')
 
 from tracing.selenium_utils.common import *
 from tracing.selenium_utils.controls import *
@@ -51,6 +54,25 @@ def find_radio_or_checkbox_buttons(driver,
                 result.append(elem)
     
     return result
+
+
+def get_no_href_buttons(driver, contains, not_contains=None, get_type = 1):
+        '''
+            Find no href link or button based on contains and not_contains parameters.
+        '''
+        result = []
+
+        if get_type == 1:
+            elements = find_buttons_or_links(driver, contains, not_contains)
+        else:
+            elements = find_buttons(driver, contains, not_contains)
+
+        for btn in elements:
+            if btn.get_attribute('href') == normalize_url(get_url(driver)):
+                continue
+            result.append(btn)
+
+        return result
 
 
 def find_elements_with_attribute(driver,

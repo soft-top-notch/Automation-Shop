@@ -5,13 +5,14 @@ import sys
 
 sys.path.insert(0, '../tracing')
 
-from shop_tracer import *
-from selenium_helper import *
-from trace_logger import *
 import common_actors
 import user_data
-from datetime import datetime
 
+from tracing.selenium_utils.common import *
+from tracing.selenium_utils.controls import *
+from trace_logger import *
+from datetime import datetime
+from shop_tracer import *
 from contextlib import contextmanager
 
 @contextmanager
@@ -50,7 +51,7 @@ with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()
-        status = tracer.trace(url, 60, attempts=3, delaying_time=10)
+        status = tracer.trace(url, 60, attempts=3, delaying_time=2)
         new_time = datetime.now()
 
         if status.state == States.purchased:
