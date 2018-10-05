@@ -12,6 +12,7 @@ import json
 import uuid
 from queue import Queue
 
+import scipy.misc as misc
 
 num_threads = 8
 resources = '../../../resources/'

@@ -67,6 +67,8 @@ class A3CModel:
 
     def build_inputs(self):
         with tf.variable_scope('inputs') as sc:
+            self.move_rnn = tf.placeholder_with_default(True, (), "move_rnn")
+            
             # Batch x h x 612
             self.img = tf.placeholder(tf.float32, (None, 300, 300, 3), "img")
             self.dropout = tf.placeholder(tf.float32, (), "dropout")
@@ -91,17 +93,30 @@ class A3CModel:
 
 
     def build_lstm(self):
-        self.lstm = tf.nn.rnn_cell.LSTMCell(self.rnn_size, state_is_tuple=False)
-        self.lstm_init_state = self.lstm.zero_state(1, dtype=tf.float32)
+        self.lstm_cell = tf.nn.rnn_cell.LSTMCell(self.rnn_size, state_is_tuple=True)
+        self.lstm_init_state = self.lstm_cell.zero_state(1, dtype=tf.float32)
         
         actions_repr = tf.one_hot(self.performed_actions, self.num_actions)
+        actions_repr = tf.cast(actions_repr, dtype=tf.float32)
         img_repr = slim.fully_connected(self.net, 100)
-
-        rnn_input = tf.stack([actions_repr, img_repr], -1)
         
-        self.state, self.rnn_output = self.rnn = tf.nn.dynamic_rnn(
-            self.lstm, rnn_input, initial_state = self.lstm_init_state)
-        self.rnn_out = slim.flatten(slim.fully_connected(self.rnn_output, 100))
+        rnn_input = tf.concat([actions_repr, img_repr], -1)
+        rnn_input = tf.expand_dims(rnn_input, 0)
+        
+        # Batch = 1, Time, Channels
+        rnn_input = tf.reshape(rnn_input, (1, -1, 100 + self.num_actions))
+        
+        self.rnn_output, self.state = tf.nn.dynamic_rnn(
+            self.lstm_cell, rnn_input, initial_state = self.lstm_init_state)
+        
+        self.rnn_output = tf.reshape(self.rnn_output, (-1, self.rnn_size))
+        
+        output = tf.cond(self.move_rnn, 
+                         lambda:self.rnn_output, 
+                         lambda:self.lstm_init_state.h)
+        
+        output = tf.reshape(output, (-1, self.rnn_size))
+        self.rnn_out = slim.flatten(slim.fully_connected(output, 100))
     
     
     def build_cnn(self):
@@ -112,8 +127,7 @@ class A3CModel:
             self.net = slim.flatten(self.net)
                 
             if not self.train_deep:
-               self.net = tf.stop_gradient(self.net)
-
+                self.net = tf.stop_gradient(self.net)
 
 
     def build_a3c(self):
@@ -200,55 +214,67 @@ class A3CModel:
         
         self.train_op = tf.group(policy_train_op, value_train_op)
         
+        
+    def add_lstm_state(self, feed_dict, lstm_state = None):
+        if lstm_state is None:
+            feed_dict[self.lstm_init_state.h] = np.zeros((1, self.rnn_size), dtype=np.float32)
+            feed_dict[self.lstm_init_state.c] = np.zeros((1, self.rnn_size), dtype=np.float32)
+        else:
+            feed_dict[self.lstm_init_state.h] = lstm_state.h
+            feed_dict[self.lstm_init_state.c] = lstm_state.c
 
 
     def get_action(self, image, possible_actions, lstm_state = None, return_next_state = False):
         """
         Returns Action Id
         """
-        if lstm_state is None:
-           lstm_state = np.zeros((1, 2*self.rnn_size))
-
         feed_dict = {
             self.img: [image],
             self.possible_actions: [possible_actions],
-            self.lstm_init_state: lstm_state,
-            self.dropout: 1.0
+            self.performed_actions: [0],
+            self.dropout: 1.0,
+            self.move_rnn: False
         }
-        pi, new_lstm_state = self.session.run([self.prior_pi, self.state], feed_dict = feed_dict)
+        
+        self.add_lstm_state(feed_dict, lstm_state)
+        
+        pi = self.session.run(self.prior_pi, feed_dict = feed_dict)
         pi = np.squeeze(pi)
         print('got probabilities:', pi)
 
         action_id = np.random.choice(range(self.num_actions), p = pi)
         
+        # move state
         if return_next_state:
-           return(action_id, new_lstm_state)
+            feed_dict[self.performed_actions] = [action_id]
+            feed_dict[self.move_rnn] = True
+            
+            new_lstm_state = self.session.run(self.state, feed_dict = feed_dict)
+            return(action_id, new_lstm_state)
         else:
-           return action_id
+            return action_id
     
 
     def estimate_score(self, image, lstm_state = None):
         """
         Returns Score Estimation
         """
-        if lstm_state is None:
-           lstm_state = np.zeros((1, 2*self.rnn_size))
-
         feed_dict = {
             self.img: [image], 
-            self.lstm_init_state: lstm_state,
-            self.dropout: 1.0
+            self.performed_actions: [0],            
+            self.dropout: 1.0,
+            self.move_rnn: False
         }
+        self.add_lstm_state(feed_dict, lstm_state)
+
+        
         v = self.session.run(self.v, feed_dict = {self.img: [image], self.dropout: 1.0})
         print('got score:', v)
         return v
-       
+                   
     
     def train_from_memory(self, memory, dropout = 1.0, lr = 0.01, er = 0.01, l2 = 0.01, lstm_state = None):
         
-        if lstm_state is None:
-           lstm_state = np.zeros((1, 2*self.rnn_size))
-
         # 1. Convert Memory to Input Batch
         batch = memory.to_input()
         batch_size = len(batch['img'])
@@ -266,9 +292,10 @@ class A3CModel:
             self.dropout: dropout,
             self.lr: lr,
             self.er: er,
-            self.l2: l2,
-            self.lstm_init_state: lstm_state
+            self.l2: l2
         } 
+        
+        self.add_lstm_state(feed_dict, lstm_state)
         
         _, policy_loss, value_loss, entropy_loss = self.session.run(
             [self.train_op, self.policy_loss, self.value_loss, self.entropy_loss], feed_dict=feed_dict)
