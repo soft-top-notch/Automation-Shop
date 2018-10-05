@@ -21,7 +21,13 @@ img_folder = 'popups_dataset_imgs/'
 
 
 def dataset_item_to_str(item):
-    return '{}\t{}\t{}\t{}'.format(item['url'], item['has_popup'], item['img_file'], item['author'])
+    return '{}\t{}\t{}\t{}\t{}'.format(
+        item['url'], 
+        item['has_popup'], 
+        item['img_file'], 
+        item['author'],
+        item['to_classify']
+    )
 
 
 def str_to_dataset_item(line):
@@ -30,7 +36,8 @@ def str_to_dataset_item(line):
        'url': parts[0],
        'has_popup': parts[1] == 'True',
        'img_file': parts[2],
-       'author': parts[3]
+       'author': parts[3],
+       'to_classify': len(parts) == 4 or parts[4] == 'True'
     }
 
 
@@ -56,6 +63,75 @@ def create_driver():
     raise Exception("can't create driver")
 
 
+def read_small_image(url):
+    file = url['img_file']
+    assert os.path.isfile(file)
+    create_small_picture(url)
+    return misc.imread(get_small_picture(file))
+    
+
+def get_small_picture(file):
+    assert file[-4:] == '.png', 'file format {} is not supported only png'.format(file)
+    first_part = file[:-4]
+    
+    return first_part + '_small.png'
+
+
+def create_small_picture(url, width=300):
+    file = url['img_file']
+    
+    small_file = get_small_picture(file)
+    if not os.path.isfile(small_file):
+        # Resize image
+        img = PIL.Image.open(file)
+        scale = width / float(img.size[0])
+
+        height = int((img.size[1] * scale))
+        img = img.resize((width, height), PIL.Image.ANTIALIAS)
+        img.save(small_file)
+
+
+def create_small_pictures(urls, width=300):
+    for i, url in enumerate(urls):
+        if not os.path.isfile(url['img_file']):
+            continue
+
+        create_small_picture(url)
+        
+        if i % 100 == 0:
+            print('{}% is finished'.format(i*100./len(urls)))
+
+
+def is_empty(file):
+    array = misc.imread(file)
+    return np.all(array == array[0,0])
+
+
+def filter_empty_imgs(dataset):
+    urls = load_dataset(dataset)
+    tmp = dataset + '.tmp'
+    empty = 0
+    with open(tmp, 'w') as f:
+        for url in urls:
+            file = url['img_file']
+            if not os.path.isfile(file):
+                empty += 1
+                continue
+
+            if is_empty(file):
+                empty += 1
+                continue
+            
+            line = dataset_item_to_str(url)
+            f.write(line + '\n')
+            f.flush()
+        
+    print('found empty pictures: ', empty)
+
+    os.rename(tmp, dataset)
+    
+    
+    
 class UrlPopupsChecker:
     
     def __init__(self, dataset_file, img_folder, already_read):
@@ -178,6 +254,12 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
 if __name__ == '__main__':
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
     extracted_popup_urls = create_popup_dataset(dataset_file)
+    
+    print('filtering empty images')
+    filter_empty_imgs(dataset)
+
+    print('creating small images')
+    create_small_pictures(urls)
 
     print('processed urls: ', len(extracted_popup_urls))
 

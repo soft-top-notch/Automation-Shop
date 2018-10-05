@@ -14,10 +14,11 @@ import PIL
 
 import numpy as np
 
-from create_dataset import load_dataset
+from create_dataset import *
 
 urls = load_dataset('../../../resources/popups_dataset.csv')
 
+urls = list([url for url in urls if url['to_classify'] == True])
 random.shuffle(urls)
 
 split = int(len(urls) * 0.8)
@@ -82,22 +83,8 @@ class PopupClassifier:
             yield batch
     
     
-    def read_image(self, path, width = 300):
-        # Resize image
-        img = PIL.Image.open(path)
-        scale = width / float(img.size[0])
-
-        height = int((img.size[1] * scale))
-        img = img.resize((width, height), PIL.Image.ANTIALIAS)
-        
-        image = np.array(img)
-        
-        #tmp = 'img.tmp'
-        #img.save(tmp)
-        
-        # Read as a numpy array
-        #image = misc.imread(tmp)
-        #os.remove(tmp)
+    def read_image(self, url):
+        image = read_small_image(url)
         
         image = image[:, :, :3]
         [h, w, _] = image.shape
@@ -118,7 +105,7 @@ class PopupClassifier:
             else:
                 labels.append([0, 1])
             
-            img = self.read_image(item['img_file'])
+            img = self.read_image(item)
             imgs.append(img)
         
         return {
