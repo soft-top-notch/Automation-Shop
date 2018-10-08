@@ -36,9 +36,8 @@ print('test size: ', len(test_urls))
 
 
 class PopupClassifier:
-    def __init__(self, a3c_model, is_training = True):
-        self.a3c_model = a3c_model
-        self.session = self.a3c_model.session
+    def __init__(self, session, is_training = True):
+        self.session = session
         self.build_graph(is_training)
         
         
@@ -53,7 +52,7 @@ class PopupClassifier:
 
         with slim.arg_scope(inception_resnet_v2_arg_scope()):
             self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(
-                   self.img, None, dropout_keep_prob = 1.0, is_training = is_training, reuse=True)
+                   self.img, None, dropout_keep_prob = 1.0, is_training = is_training, reuse=tf.AUTO_REUSE)
             # Batch x Channels
             self.net = slim.flatten(self.net)
 
@@ -69,7 +68,7 @@ class PopupClassifier:
                                   weights_regularizer = l2_reg
                                 ):
                 
-                self.fc2 = slim.fully_connected(self.a3c_model.net, 100)
+                self.fc2 = slim.fully_connected(self.net, 100)
                 self.flat = slim.dropout(self.fc2, self.dropout, scope='dropout')
 
                 # Popup logits
@@ -124,7 +123,7 @@ class PopupClassifier:
             imgs.append(img)
         
         return {
-                self.a3c_model.img: imgs,
+                self.img: imgs,
                 self.labels: labels
             }
     
@@ -180,12 +179,10 @@ class PopupClassifier:
 tf.reset_default_graph()
 session = tf.Session()
 
-a3cmodel = A3CModel(len(Actions.actions), session = session, train_deep = False)
-classifier = PopupClassifier(a3cmodel)
+classifier = PopupClassifier(session)
 
 session.run(tf.global_variables_initializer())
 a3cmodel.init_from_checkpoint('inception_resnet_v2_2016_08_30.ckpt')
-
 saver = tf.train.Saver()
 
 checkpoint = None
