@@ -4,8 +4,12 @@ from tracing.rl.rewards import PopupRewardsCalculator
 from tracing.rl.environment import Environment
 from tracing.rl.actor_learner import ActionsMemory
 from tracing.rl.actor_learner import ActorLearnerWorker
+
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+import tensorflow.contrib.slim.nets as nets
+import nets.inception_resnet_v2
+from nets.inception_resnet_v2 import inception_resnet_v2_arg_scope
 
 import threading
 import csv, re
@@ -30,19 +34,28 @@ print('test size: ', len(test_urls))
 
 
 class PopupClassifier:
-    def __init__(self, a3c_model):
+    def __init__(self, a3c_model, is_training = True):
         self.a3c_model = a3c_model
         self.session = self.a3c_model.session
-        self.build_graph()
+        self.build_graph(is_training)
         
         
-    def build_graph(self):
+    def build_graph(self, is_training):
         with tf.variable_scope('popups_classification') as sc:
-            self.labels = tf.placeholder(tf.float32, (None, 2), "img")
-            self.lr = tf.placeholder(tf.float32, (), "lr")
             self.dropout = tf.placeholder(tf.float32, (), "dropout")
+            self.lr = tf.placeholder(tf.float32, (), "lr")
             self.l2 = tf.placeholder(tf.float32, (), "l2")
-            
+
+            self.img = tf.placeholder(tf.float32, (None, 300, 300, 3), "img")
+            self.labels = tf.placeholder(tf.float32, (None, 2), "labels")
+
+        with slim.arg_scope(inception_resnet_v2_arg_scope()):
+            self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(
+                   self.img, None, dropout_keep_prob = 1.0, is_training = is_training, reuse=True)
+            # Batch x Channels
+            self.net = slim.flatten(self.net)
+
+        with tf.variable_scope('popups_classification') as sc:
             l2_reg = slim.l2_regularizer(self.l2)
             he_init = tf.contrib.layers.variance_scaling_initializer(mode="FAN_AVG")
             xavier_init = tf.contrib.layers.xavier_initializer()
@@ -172,7 +185,7 @@ session.run(tf.global_variables_initializer())
 a3cmodel.init_from_checkpoint('inception_resnet_v2_2016_08_30.ckpt')
 
 
-for epoch in range(60):
+for epoch in range(100):
     print('epoch ', epoch)
     classifier.train(train_urls, epochs=1)
     train_f1 = classifier.measure(train_urls)

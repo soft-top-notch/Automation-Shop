@@ -69,7 +69,7 @@ class A3CModel:
         with tf.variable_scope('inputs') as sc:
             self.move_rnn = tf.placeholder_with_default(True, (), "move_rnn")
             
-            # Batch x h x 612
+            # Batch x 300 x 300
             self.img = tf.placeholder(tf.float32, (None, 300, 300, 3), "img")
             self.dropout = tf.placeholder(tf.float32, (), "dropout")
             
