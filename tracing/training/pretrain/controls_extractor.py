@@ -101,7 +101,7 @@ for url in smoke_urls[:10]:
 
 
 imgs_folder = 'imgs'
-dataset = 'dataset.jsonl'
+dataset = 'controls.jsonl'
 
 # clear results file
 open(dataset, 'w').close()
