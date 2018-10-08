@@ -92,8 +92,8 @@ for i in range(num_workers):
                                 1000, 
                                 n_step = 10, 
                                 lr=0.001, 
-                                l2 = 0.03,
-                                entropy_l=0.2, 
+                                l2 = 0.003,
+                                entropy_l=0.1, 
                                 dropout = 0.8, 
                                 gamma=0.99)
     workers.append(worker)

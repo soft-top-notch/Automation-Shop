@@ -13,11 +13,13 @@ import random
 import PIL
 
 import numpy as np
-
+import random
 from create_dataset import *
 
-urls = load_dataset('../../../resources/popups_dataset.csv')
 
+random.seed(0)
+
+urls = load_dataset('../../../resources/popups_dataset.csv')
 urls = list([url for url in urls if url['to_classify'] == True])
 random.shuffle(urls)
 
@@ -171,16 +173,30 @@ classifier = PopupClassifier(a3cmodel)
 session.run(tf.global_variables_initializer())
 a3cmodel.init_from_checkpoint('inception_resnet_v2_2016_08_30.ckpt')
 
+saver = tf.train.Saver()
 
-for epoch in range(80):
+checkpoint = None
+start_epoch = 0
+for i in range(100):
+    fname = 'classification_model/{}'.format(i)
+    if os.path.exists(fname + '.index'):
+        checkpoint = fname
+        start_epoch = i + 1
+
+if checkpoint:
+    print('loading checkpoint', checkpoint)
+    saver.restore(session, checkpoint)
+
+
+for epoch in range(start_epoch, 100):
     print('epoch ', epoch)
-    classifier.train(train_urls, epochs=1, lr = 0.0001)
+    classifier.train(train_urls, epochs=1, lr = 0.0001, dropout = 0.65)
     train_f1 = classifier.measure(train_urls)
     print('train f1:', train_f1)
     
     test_f1 = classifier.measure(test_urls)
     print('test f1:', test_f1)
+    
+    if epoch % 10 == 9:
+        saver.save(session, 'classification_model/{}'.format(epoch))
 
-
-saver = tf.train.Saver()
-saver.save(self.session, 'classification_model')
