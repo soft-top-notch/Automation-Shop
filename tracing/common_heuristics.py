@@ -1,11 +1,17 @@
-from selenium_helper import *
 import nlp
 import time
 import logging
 import random
+import sys
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
+
+sys.path.insert(0, '..')
+
+from tracing.selenium_utils.common import *
+from tracing.selenium_utils.controls import *
+
 
 def get_label_text_with_attribute(driver, elem):
     label_text = ""
@@ -29,6 +35,7 @@ def get_label_text_with_attribute(driver, elem):
 
     return label_text
 
+
 def find_radio_or_checkbox_buttons(driver,
                                   contains=None,
                                   not_contains=None):
@@ -48,6 +55,26 @@ def find_radio_or_checkbox_buttons(driver,
     
     return result
 
+
+def get_no_href_buttons(driver, contains, not_contains=None, get_type = 1):
+        '''
+            Find no href link or button based on contains and not_contains parameters.
+        '''
+        result = []
+
+        if get_type == 1:
+            elements = find_buttons_or_links(driver, contains, not_contains)
+        else:
+            elements = find_buttons(driver, contains, not_contains)
+
+        for btn in elements:
+            if btn.get_attribute('href') == normalize_url(get_url(driver)):
+                continue
+            result.append(btn)
+
+        return result
+
+
 def find_elements_with_attribute(driver,
                                 attr_tagname,
                                 attr_type,
@@ -55,27 +82,13 @@ def find_elements_with_attribute(driver,
     return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
 
-
-def is_link(driver, elem):
-    current_url = normalize_url(get_url(driver))
-    
-    try:
-        href = elem.get_attribute('href')
-        href = normalize_url(href)
-        return href and not href.startswith('javascript:') and href != current_url
-    except:
-        logger = logging.getLogger('shop_tracer')
-        logger.debug('Unexpected exception during check if element is link {}'.format(traceback.format_exc()))
-        return False
-
-
 def find_links(driver, contains=None, not_contains=None):
-    links = driver.find_elements_by_css_selector("a[href]")
     result = []
-    for link in links:
-        if not can_click(link) or not is_link(driver, link):
-            continue
 
+    for link in get_links(driver):
+        if not can_click(link):
+            continue
+            
         if get_url(driver) == link.get_attribute("href"):
             continue
 
@@ -130,15 +143,9 @@ def find_sub_elements(driver, element, contains=None, not_contains=None):
 
 def find_buttons(driver, contains=None, not_contains=None):
     
-    links = [elem for elem in driver.find_elements_by_tag_name("a") if not is_link(driver, elem)]
-    buttons = driver.find_elements_by_tag_name("button")
-    inputs = driver.find_elements_by_css_selector('input[type="button"]')
-    submits = driver.find_elements_by_css_selector('input[type="submit"]')
-    imgs = driver.find_elements_by_css_selector('input[type="image"]')
-
     # Yield isn't good because context can change
     result = []
-    for elem in links + buttons + inputs + submits + links + imgs:
+    for elem in get_buttons(driver):
         if not can_click(elem):
             continue
         text = elem.get_attribute("innerHTML").strip() + \
@@ -177,7 +184,7 @@ def click_first(driver, elements, on_error=try_handle_popups, randomize = False)
         try:
             # process links by opening url
             href = element.get_attribute("href")
-            if is_link(driver, element):
+            if is_link(element):
                 driver.get(href)
                 return True
 
@@ -242,6 +249,7 @@ def find_text_element(driver, contains=None, not_contains=None):
             result = elem
 
     return result
+
 
 def is_empty_cart(driver):
     text = get_page_text(driver)

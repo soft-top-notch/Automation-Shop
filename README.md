@@ -3,6 +3,8 @@
 Code that buys something from shops and saves traces.
 Navigation and checkout page filling is heuristic based.
 
+#### Installation
+pip install -I trace_automation
 
 ### Deploy in Test Environment
 

@@ -1,21 +1,18 @@
 import random
 import csv
 import logging
-
-from shop_tracer import *
-from selenium_helper import *
-import trace_logger
-import common_actors
-import user_data
-from status import *
-
-import csv
-
 from queue import Queue
 import threading
 import time
-
 from contextlib import contextmanager
+
+
+from tracing.shop_tracer import *
+import tracing.trace_logger as trace_logger
+import tracing.common_actors as common_actors
+import tracing.user_data as user_data
+from tracing.status import *
+
 
 num_threads = 8 # Number of threads to run
 num_urls = 100  # Number of urls to sample 

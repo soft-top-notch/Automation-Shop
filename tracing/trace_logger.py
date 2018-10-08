@@ -1,11 +1,12 @@
-from abc import ABCMeta, abstractmethod
-from selenium_helper import *
+from abc import abstractmethod
 from collections import namedtuple
 import uuid
 import os.path
 import os
 import json
 import tempfile
+
+from tracing.selenium_utils.common import *
 
 
 class TraceEncoder(json.JSONEncoder):
@@ -80,7 +81,10 @@ class FileTraceLogger(ITraceLogger):
         self._img_folder = img_folder
         
         # clear results file
-        open(self._results_file, 'w').close()
+        dirname = os.path.dirname(results_file)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        open(results_file, 'w+').close()
         
         # create image folder if not exists
         if not os.path.exists(img_folder):

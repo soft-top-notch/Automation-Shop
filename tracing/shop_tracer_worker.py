@@ -1,10 +1,10 @@
-from shop_tracer import ShopTracer
-import trace_logger
-import common_actors
-import user_data
-
 import os, logging, mongoengine, time, threading, pika, configparser
 import json
+
+from tracing.shop_tracer import ShopTracer
+import tracing.trace_logger
+import tracing.common_actors
+import tracing.user_data
 
 
 class Worker(threading.Thread):

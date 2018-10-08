@@ -1,12 +1,15 @@
 import logging
 import traceback
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import requests
 import selenium
-from common_heuristics import *
-from selenium_helper import *
-from status import *
-import user_data
+import sys
+
+sys.path.insert(0, '..')
+
+from tracing.common_heuristics import *
+from tracing.selenium_utils.common import *
+from tracing.status import *
 
 
 class States:
@@ -222,7 +225,7 @@ class ShopTracer:
         :param domain:                 Shop domain to trace
         :param wait_response_seconds:  Seconds to wait response from shop
         :param attempts:               Number of attempts to navigate to checkout page
-        :return:                       ICrawlingStatus
+        :return:                       ITracingStatus
         """
 
         result = None
