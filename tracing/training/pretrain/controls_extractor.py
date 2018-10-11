@@ -1,7 +1,5 @@
 from tracing.rl.environment import Environment
 from tracing.rl.actions import Actions
-import tracing.selenium_utils.common as common
-import tracing.selenium_utils.controls as sc
 
 import csv, re
 import PIL
@@ -9,7 +7,6 @@ import numpy as np
 import uuid
 import os
 import json
-import random
 import threading
 from queue import Queue
 import traceback
@@ -42,7 +39,9 @@ class ControlsExtractor:
         while True:
             url = self.queue.get()
             self.extract(url)
-       
+            self.queue.task_done()
+
+
     def extract(self, url):
         env = Environment()
         with env:
@@ -83,25 +82,26 @@ class ControlsExtractor:
                     f.write('\n')
                     
                     
-smoke_urls = []
+urls = []
 
-pattern = '(smok)|(cig)|(vape)|(tobac)'
-with open('../../resources/pvio_vio_us_ca_uk_sample1.csv') as f:
-    rows = csv.reader(f)
-    for row in rows:
-        url = row[0]
-        if re.match(pattern, url):
-            smoke_urls.append(url)
+dataset_file = '../../../resources/popups_dataset.csv'
 
-print('Found {} url'.format(len(smoke_urls)))
+with open(dataset_file, 'r') as f:
+    for row in f:
+        items = row.strip().split('\t')
+        has_popup = items[1] == 'True'
+        if has_popup:
+             urls.append(items[0])
 
+print('Found {} url'.format(len(urls)))
+urls = ['powervapes.net']
 queue = Queue()
-for url in smoke_urls[:10]:
+for url in urls:
     queue.put(url)
 
 
 imgs_folder = 'imgs'
-dataset = 'controls.jsonl'
+dataset = 'controls_popups_dataset.jsonl'
 
 # clear results file
 open(dataset, 'w').close()
@@ -115,7 +115,7 @@ old_files = [ f for f in os.listdir(imgs_folder) if f.endswith(".png") ]
 for file in old_files:
     os.remove(os.path.join(imgs_folder, file))
     
-num_threads = 4
+num_threads = 8
 
 
 for _ in range(num_threads):

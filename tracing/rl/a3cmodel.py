@@ -4,7 +4,7 @@ import tensorflow.contrib.slim.nets as nets
 import nets.nasnet.pnasnet
 import nets.inception_resnet_v2
 from nets.inception_resnet_v2 import inception_resnet_v2_arg_scope
-
+import random
 
 import numpy as np
 
@@ -13,7 +13,6 @@ class A3CModel:
     local_scope = "local_model_scope"
     
     def __init__(self, num_actions, 
-                 global_model = None, 
                  session = None,
                  train_deep = True,
                  rnn_size = 100
@@ -82,8 +81,11 @@ class A3CModel:
             # Entropy Rate (use for regularization)
             self.er = tf.placeholder_with_default(0.01, (), 'er')
             
-            # Batch, Number of Action
-            self.performed_actions = tf.placeholder(tf.int32, (None), "performed_actions")
+            # Batch, has indexes of chosed actions
+            self.chosen_actions = tf.placeholder(tf.int32, (None), "chosen_actions")
+
+            # Batch 
+            self.is_action_applied = tf.placeholder(tf.float32, (None), "is_action_applied")
 
             # Actions that was done in the previous step
             self.prev_actions = tf.placeholder(tf.int32, (None), "prev_acitons")
@@ -92,14 +94,14 @@ class A3CModel:
             self.rewards = tf.placeholder(tf.float32, (None), 'rewards')
 
             # Batch x num_actions
-            self.possible_actions = tf.placeholder(tf.float32, (None, self.num_actions), 'possible_actions')
+            self.possible_actions = tf.placeholder(tf.float32, (None, self.num_actions - 1), 'possible_actions')
 
 
     def build_lstm(self):
         self.lstm_cell = tf.nn.rnn_cell.LSTMCell(self.rnn_size, state_is_tuple=True)
         self.lstm_init_state = self.lstm_cell.zero_state(1, dtype=tf.float32)
         
-        actions_repr = tf.one_hot(self.prev_actions, self.num_actions)
+        actions_repr = tf.one_hot(self.prev_actions, self.num_actions - 1)
         actions_repr = tf.cast(actions_repr, dtype=tf.float32)
         img_repr = slim.fully_connected(self.net, 100)
         
@@ -107,7 +109,7 @@ class A3CModel:
         rnn_input = tf.expand_dims(rnn_input, 0)
         
         # Batch = 1, Time, Channels
-        rnn_input = tf.reshape(rnn_input, (1, -1, 100 + self.num_actions))
+        rnn_input = tf.reshape(rnn_input, (1, -1, 100 + self.num_actions - 1))
         
         self.rnn_output, self.state = tf.nn.dynamic_rnn(
             self.lstm_cell, rnn_input, initial_state = self.lstm_init_state)
@@ -147,22 +149,29 @@ class A3CModel:
                                 ):
                 
                
+                self.fc1 = slim.fully_connected(self.net, 100)
                 self.fc2 = slim.fully_connected(self.net, 100)
+                self.fc3 = slim.fully_connected(self.net, 100)
+               
+                #self.policy_input = tf.concat([self.fc1, self.rnn_out], -1)
+                self.policy_input = slim.dropout(self.fc1, self.dropout, scope='dropout')
 
-                self.policy_input = tf.concat([self.fc2, self.rnn_out], -1)
-
-                self.policy_input = slim.dropout(self.policy_input, self.dropout, scope='dropout')
+                self.gate_input = tf.concat([self.fc2, self.rnn_out], -1)
+                self.gate_input = slim.dropout(self.gate_input, self.dropout, scope='dropout')
 
                 # Policy
-                self.logits = slim.fully_connected(self.policy_input, self.num_actions, activation_fn=None)
+                self.logits = slim.fully_connected(self.policy_input, self.num_actions - 1, activation_fn=None)
                 self.pi = tf.nn.softmax(self.logits)
-
-                # Policy with Prior knowledge of possible actions
-                self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
-                self.prior_logits = self.logits + tf.log(self.possible_proba)
-                self.prior_pi = tf.nn.softmax(self.prior_logits)
+                
+                # Apply/Do Nothing Gate
+                # Batch x num_actions
+                self.gate_logits = slim.fully_connected(self.gate_input, self.num_actions - 1, activation_fn=None)
+                self.gate_proba = tf.nn.sigmoid(self.gate_logits)
 
                 # Critic
+                self.critic_input = tf.concat([self.fc3, self.rnn_out], -1)
+                self.critic_input = slim.dropout(self.critic_input, self.dropout, scope='dropout')
+
                 self.v = slim.fully_connected(self.policy_input, 1, activation_fn=None)
                 self.v = slim.flatten(self.v)
 
@@ -177,28 +186,42 @@ class A3CModel:
         self.value_loss = tf.losses.mean_squared_error(self.rewards, self.v)
         
         # Policy Loss: Log(pi) * advantage
-        # Batch x actions
-        self.policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-             labels = self.performed_actions, 
-             logits = self.logits)
-
         # Batch
-        self.policy_loss *= tf.stop_gradient(self.advantage)
+        filtered_logits = self.possible_actions * self.logits
+        self.action_policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+             labels = self.chosen_actions,
+             logits = filtered_logits)
+
+        # Gate Policy Loss
+        chosen_logits = tf.gather(self.gate_logits, self.chosen_actions, axis = -1)
+        self.gate_policy_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            labels = self.is_action_applied,
+            logits = chosen_logits
+        )
+
+        self.gate_policy_loss = tf.reduce_sum( self.gate_policy_loss, axis=-1)
+
+        self.policy_loss = (self.action_policy_loss + self.gate_policy_loss) * tf.stop_gradient(self.advantage)
         self.policy_loss = tf.reduce_mean(self.policy_loss)
+
         
         # Entropy: H(pi)  (regularization)
         # Take into account only possible actions
-        filtered_logits = self.possible_actions * self.logits
-        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+        pi_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
               labels = tf.nn.softmax(filtered_logits), 
-              logits = filtered_logits)# * self.possible_actions
+              logits = filtered_logits)
 
-        self.entropy_loss = -self.er * tf.reduce_sum(entropy, axis = -1)
+        self.pi_entropy_loss = -self.er * tf.reduce_sum(pi_entropy, axis = -1)
+        self.pi_entropy_loss = tf.reduce_mean(self.pi_entropy_loss)
+        
+        gate_entropy = - (tf.log(self.gate_proba)*self.gate_proba + tf.log(1 - self.gate_proba) + (1 - self.gate_proba))
+        self.gate_entropy_loss = -self.er * gate_entropy
+        self.gate_entropy_loss = tf.reduce_mean(self.gate_entropy_loss)
 
-        # If the goal (reward 3 is harcoded so far) is reached - then don't use entropy 
+        # If the goal (reward 3 is hardcoded so far) is reached - then don't use entropy
         size = tf.shape(self.rewards)[0]
         self.dist = (3 - tf.gather(self.rewards, size - 1)) / 3.0
-        self.entropy_loss = self.dist * tf.reduce_mean(self.entropy_loss)
+        self.entropy_loss = self.dist * (self.pi_entropy_loss + self.gate_entropy_loss)
 
         # Possible actions loss
         self.possible_loss = (1-self.possible_actions) * self.pi * self.pi
@@ -206,7 +229,7 @@ class A3CModel:
         self.possible_loss = 10*tf.reduce_mean(self.possible_loss)
 
         # Final Loss
-        self.loss = self.policy_loss + self.value_loss + self.entropy_loss
+        self.loss = self.policy_loss + self.value_loss + self.entropy_loss + self.possible_loss
         
 
     def add_train_op(self):
@@ -240,17 +263,23 @@ class A3CModel:
         
         self.add_lstm_state(feed_dict, lstm_state)
         
-        pi, new_lstm_state = self.session.run([self.prior_pi, self.state], feed_dict = feed_dict)
+        pi, gate_proba, new_lstm_state = self.session.run([self.pi, self.gate_proba, self.state], feed_dict = feed_dict)
         pi = np.squeeze(pi)
+        gate_proba = np.squeeze(gate_proba)
         print('got probabilities:', pi)
 
-        action_id = np.random.choice(range(self.num_actions), p = pi)
+        action_id = np.random.choice(range(self.num_actions - 1), p = pi)
+
+        action_proba = gate_proba[action_id]
+        print('action_proba:', action_proba)
+        
+        to_apply = random.random() <= action_proba
         
         # move state
         if return_next_state:
-            return(action_id, new_lstm_state)
+            return (action_id, to_apply, new_lstm_state)
         else:
-            return action_id
+            return (action_id, to_apply)
     
 
     def estimate_score(self, image, prev_action, lstm_state = None):
@@ -282,9 +311,10 @@ class A3CModel:
         prev_actions = [memory.prev_action] + batch['actions'][:-1]
         feed_dict = {
             self.img: batch['img'],
-            self.performed_actions: batch['actions'],
-            self.prev_actions: prev_actions,
+            self.chosen_actions: batch['actions'],
+            self.is_action_applied: batch['is_applied'],
 
+            self.prev_actions: prev_actions,
             self.rewards: batch['rewards'],
             self.possible_actions: batch['possible_actions'],
 

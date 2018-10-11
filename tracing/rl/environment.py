@@ -90,7 +90,7 @@ class Environment:
 
     
     def refresh_controls_if_needs(self):
-        if self.passes >= self.max_passes or self.is_final() or not self.is_changed:
+        if self.passes >= self.max_passes or (self.rewards and self.is_final()) or not self.is_changed:
             return False
            
         self.try_switch_to_default()

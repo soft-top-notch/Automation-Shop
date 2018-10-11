@@ -75,8 +75,7 @@ class Control:
        size = get_size(elem)
        loc = get_location(elem)
         
-        # right bottom location
-       return {'x': loc['x'] + size['width'], 
+       return {'x': loc['x'] + size['width'],
              'y': loc['y'] + size['height']}
         
 
@@ -340,25 +339,46 @@ def get_label_with_elem(element):
     :return:             Tuple: (Label, Label element)
     """
     driver = element.parent
-    id = element.get_attribute("id")
-    if id:
-        labels = driver.find_elements_by_css_selector('label[for="{}"]'.format(id))
-        if labels:
-            return (labels[0].get_attribute("innerText"), labels[0])
 
-    parent = element.find_element_by_xpath('..')
-    if parent and parent.tag_name == "label":
-        return (parent.get_attribute("innerText"), parent)
+    def get_value():
+        value = element.get_attribute('value')
+        if value:
+            return value
 
-    placeholder = element.get_attribute('placeholder')
-    if placeholder:
-        return (placeholder, element)
+        placeholder = element.get_attribute('placeholder')
+        if placeholder:
+            return placeholder
 
-    
-    if len(parent.find_elements_by_css_selector("*")) == 1:
-        return (parent.get_attribute("innerText"), parent)
+        return ''
 
-    return (None, element)
+    def get_label():
+        ids = [element.get_attribute("id"), element.get_attribute('name')]
+        for id in ids:
+            if not id:
+                continue
+
+            labels = driver.find_elements_by_css_selector('label[for="{}"]'.format(id))
+            if labels:
+                return (labels[0].get_attribute("innerText"), labels[0])
+
+        parent = element.find_element_by_xpath('..')
+        if parent and parent.tag_name == "label":
+            return (parent.get_attribute("innerText"), parent)
+
+        if len(parent.find_elements_by_css_selector("*")) == 1:
+            return (parent.get_attribute("innerText"), parent)
+
+        return ('', element)
+
+    label, elem = get_label()
+    value = get_value()
+
+    if label and value:
+        return (value + '\n' + label, elem)
+    if value:
+        return (value, elem)
+
+    return (label, elem)
 
 
 def get_label(element):
