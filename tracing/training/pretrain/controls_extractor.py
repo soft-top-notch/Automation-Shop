@@ -94,7 +94,6 @@ with open(dataset_file, 'r') as f:
              urls.append(items[0])
 
 print('Found {} url'.format(len(urls)))
-urls = ['powervapes.net']
 queue = Queue()
 for url in urls:
     queue.put(url)

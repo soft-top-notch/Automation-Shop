@@ -15,7 +15,8 @@ class A3CModel:
     def __init__(self, num_actions, 
                  session = None,
                  train_deep = True,
-                 rnn_size = 100
+                 rnn_size = 100,
+                 is_for_train = True
                  ):
         
         self.num_actions = num_actions
@@ -26,7 +27,8 @@ class A3CModel:
         
         self.train_deep = train_deep
         self.rnn_size = rnn_size
-        
+        self.is_for_train = is_for_train
+
         self.build()
         
     
@@ -125,14 +127,16 @@ class A3CModel:
     
     
     def build_cnn(self):
-        with slim.arg_scope(inception_resnet_v2_arg_scope(batch_norm_updates_collections=[])):
+        with slim.arg_scope(inception_resnet_v2_arg_scope()):
             self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(
-                   self.img, None, dropout_keep_prob = 1.0, is_training = False)
+                   self.img, None, dropout_keep_prob = 1.0, is_training = self.is_for_train)
             # Batch x Channels
             self.net = slim.flatten(self.net)
                 
             if not self.train_deep:
                 self.net = tf.stop_gradient(self.net)
+
+            self.text_pretrain = slim.fully_connected(self.net, 512)
 
 
     def build_a3c(self):
@@ -163,6 +167,11 @@ class A3CModel:
                 self.logits = slim.fully_connected(self.policy_input, self.num_actions - 1, activation_fn=None)
                 self.pi = tf.nn.softmax(self.logits)
                 
+                # Policy with Prior knowledge of possible actions
+                self.possible_proba = tf.clip_by_value(self.possible_actions, 1e-5, 1)
+                self.prior_logits = self.logits + tf.log(self.possible_proba)
+                self.prior_pi = tf.nn.softmax(self.prior_logits)
+
                 # Apply/Do Nothing Gate
                 # Batch x num_actions
                 self.gate_logits = slim.fully_connected(self.gate_input, self.num_actions - 1, activation_fn=None)
@@ -263,7 +272,7 @@ class A3CModel:
         
         self.add_lstm_state(feed_dict, lstm_state)
         
-        pi, gate_proba, new_lstm_state = self.session.run([self.pi, self.gate_proba, self.state], feed_dict = feed_dict)
+        pi, gate_proba, new_lstm_state = self.session.run([self.prior_pi, self.gate_proba, self.state], feed_dict = feed_dict)
         pi = np.squeeze(pi)
         gate_proba = np.squeeze(gate_proba)
         print('got probabilities:', pi)
