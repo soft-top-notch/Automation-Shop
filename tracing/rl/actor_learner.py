@@ -151,6 +151,10 @@ class ActorLearnerWorker(threading.Thread):
     
     def act(self, url):
         sum_reward = 0
+
+        if not self.env.start(url):
+            return None
+
         while not self.env.is_final and self.env.has_next_controls():
             ctrl = self.env.get_next_control()
             inp = self.env.get_control_as_input(ctrl)
@@ -165,6 +169,7 @@ class ActorLearnerWorker(threading.Thread):
        
         v_score = self.env.calc_final_reward()
         sum_reward += v_score * (self.gamma ** self.env.step)
+
         return sum_reward
 
 

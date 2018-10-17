@@ -5,8 +5,8 @@ import nets.nasnet.pnasnet
 import nets.inception_resnet_v2
 from nets.inception_resnet_v2 import inception_resnet_v2_arg_scope
 import random
-
 import numpy as np
+
 
 class A3CModel:
     global_scope = "global_model_scope"
@@ -152,10 +152,10 @@ class A3CModel:
                                   weights_regularizer = l2_reg
                                 ):
                 
-               
-                self.fc1 = slim.fully_connected(self.net, 100)
-                self.fc2 = slim.fully_connected(self.net, 100)
-                self.fc3 = slim.fully_connected(self.net, 100)
+                self.full_net = tf.concat([self.net, tf.stop_gradient(self.text_pretrain)], -1)
+                self.fc1 = slim.fully_connected(self.full_net, 200)
+                self.fc2 = slim.fully_connected(self.full_net, 200)
+                self.fc3 = slim.fully_connected(self.full_net, 200)
                
                 #self.policy_input = tf.concat([self.fc1, self.rnn_out], -1)
                 self.policy_input = slim.dropout(self.fc1, self.dropout, scope='dropout')
@@ -212,7 +212,6 @@ class A3CModel:
 
         self.policy_loss = (self.action_policy_loss + self.gate_policy_loss) * tf.stop_gradient(self.advantage)
         self.policy_loss = tf.reduce_mean(self.policy_loss)
-
         
         # Entropy: H(pi)  (regularization)
         # Take into account only possible actions

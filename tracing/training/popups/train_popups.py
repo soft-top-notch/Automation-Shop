@@ -2,11 +2,9 @@ from tracing.rl.actions import *
 from tracing.rl.a3cmodel import A3CModel
 from tracing.rl.rewards import PopupRewardsCalculator
 from tracing.rl.environment import Environment
-from tracing.rl.actor_learner import ActionsMemory
 from tracing.rl.actor_learner import ActorLearnerWorker
 import tensorflow as tf
 import threading
-import csv, re
 import random
 import os
 
@@ -17,6 +15,8 @@ os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
 
 resources = '../../../resources'
 dataset_file = resources + '/popups_dataset.csv'
+
+pretrained_checkpoint = '../pretrain/checkpoints/pretrain_checkpoint-0'
 
 hard_popup_urls = [
     # Choose from two options popups
@@ -42,8 +42,6 @@ hard_popup_urls = [
     # Accept Cookie
     'theglamourshop.com',
     'smokingvaporstore.com',
-    
-    
 ]
 
 no_popup_urls = [
@@ -79,7 +77,9 @@ num_workers = 16
 
 global_model = A3CModel(len(Actions.actions), session = session, train_deep = False)
 session.run(tf.global_variables_initializer())
-global_model.init_from_checkpoint('inception_resnet_v2_2016_08_30.ckpt')
+if pretrained_checkpoint:
+    saver = tf.train.Saver()
+    saver.restore(session, pretrained_checkpoint)
 
 workers = []
 
@@ -100,9 +100,7 @@ for i in range(num_workers):
     
 coord = tf.train.Coordinator()
 
-import numpy as np
-
-def start(worker):
+def start_learning(worker):
     while True:
         try:
             if ActorLearnerWorker.global_step < worker.max_steps:
@@ -124,7 +122,7 @@ if checkpoint:
 
 threads = []
 for worker in workers:
-    thread = threading.Thread(target=lambda: start(worker))
+    thread = threading.Thread(target=lambda: start_learning(worker))
     thread.daemon = True 
     thread.start()
     threads.append(thread)
@@ -146,3 +144,55 @@ while True:
         saved[portion] = True
     
 coord.join(threads)
+
+
+closed = 0
+tested = 0
+
+errors = []
+
+def start_acting(worker):
+    while True:
+        url = queue.get()
+        reward = worker.act(url)
+        if reward is not None:
+            continue
+
+        tested += 1
+        if reward > 0:
+            closed += 1
+        else:
+            errors.append(url)
+
+        queue.task_done()
+
+
+queue = Queue()
+for url in test_urls:
+    queue.put(url)
+
+print('Started quality measurement')
+
+
+for worker in workers:
+    thread = threading.Thread(target=lambda: start_acting(worker))
+    thread.daemon = True
+    thread.start()
+    threads.append(thread)
+
+while queue.qsize() > 0:
+    time.sleep(60)
+
+    if steps > 0:
+        print('\n\n-----> quality {} after {} steps\n\n'.format(closed/tested), tested)
+
+
+coord.join(threads)
+
+print('Finished quality measurement')
+print('Not closed urls:')
+for url in errors:
+    print(url)
+
+print('\n\nquality: {}, steps: {}'.format(closed / tested, tested))
+
