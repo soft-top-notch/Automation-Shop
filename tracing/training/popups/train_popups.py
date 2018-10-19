@@ -75,7 +75,11 @@ session = tf.Session()
 
 num_workers = 16
 
-global_model = A3CModel(len(Actions.actions), session = session, train_deep = True)
+# Do input Birth Day, Month, Year and Email
+# Do it for training Speedup
+fixed_probas = {0: 1., 1: 1., 2:1., 4:1.}
+
+global_model = A3CModel(len(Actions.actions), session = session, train_deep = True, fixed_probas = fixed_probas)
 session.run(tf.global_variables_initializer())
 if pretrained_checkpoint:
     saver = tf.train.Saver()

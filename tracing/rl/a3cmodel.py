@@ -16,7 +16,8 @@ class A3CModel:
                  session = None,
                  train_deep = True,
                  rnn_size = 100,
-                 is_for_train = True
+                 is_for_train = True,
+                 fixed_gate_probas = {}
                  ):
         
         self.num_actions = num_actions
@@ -28,6 +29,7 @@ class A3CModel:
         self.train_deep = train_deep
         self.rnn_size = rnn_size
         self.is_for_train = is_for_train
+        self.fixed_gate_probas = fixed_gate_probas
 
         self.build()
         
@@ -279,6 +281,7 @@ class A3CModel:
         action_id = np.random.choice(range(self.num_actions - 1), p = pi)
 
         action_proba = gate_proba[action_id]
+        action_proba = self.fixed_gate_probas.get(action_id, action_proba)
         print('action_proba:', action_proba)
         
         to_apply = random.random() <= action_proba
