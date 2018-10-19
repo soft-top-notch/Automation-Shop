@@ -417,7 +417,7 @@ class Environment:
             success = action.apply(control, self.driver, self.user)
 
             # Control could dissapear track it as Environment Changed
-            self.is_changed = common.is_stale(control.elem)
+            self.is_changed = not selenium_controls.is_visible(control.elem)
         except:
             success = False
             traceback.print_exc()

@@ -75,7 +75,7 @@ session = tf.Session()
 
 num_workers = 16
 
-global_model = A3CModel(len(Actions.actions), session = session, train_deep = False)
+global_model = A3CModel(len(Actions.actions), session = session, train_deep = True)
 session.run(tf.global_variables_initializer())
 if pretrained_checkpoint:
     saver = tf.train.Saver()
@@ -103,7 +103,7 @@ coord = tf.train.Coordinator()
 def start_learning(worker):
     while True:
         try:
-            if ActorLearnerWorker.global_step < worker.max_steps:
+            if ActorLearnerWorker.global_step + 1 < worker.max_steps:
                 worker.run()
             else:
                 return

@@ -136,7 +136,7 @@ class A3CModel:
             if not self.train_deep:
                 self.net = tf.stop_gradient(self.net)
 
-            self.text_pretrain = slim.fully_connected(self.net, 512)
+            self.text_pretrain = slim.fully_connected(self.net, 512, activation_fn=None)
 
 
     def build_a3c(self):
