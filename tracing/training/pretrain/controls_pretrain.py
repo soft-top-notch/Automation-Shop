@@ -11,18 +11,14 @@ import threading
 import json
 import random
 from scipy import misc
-import numpy as np
 import math
-import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pandas as pd
 import re
-import seaborn as sns
 
 
 dataset = '../../../resources/controls_popups_dataset.jsonl'
-dataset_imgs_url = "https://drive.google.com/open?id=1whS0cYpJVIhbGRdRpjkWuyj2rFLW3iEQ"
+dataset_imgs_url = "https://drive.google.com/uc?id=1whS0cYpJVIhbGRdRpjkWuyj2rFLW3iEQ&authuser=0&export=download"
 download_dataset_imgs_if_need(dataset_imgs_url)
 
 
@@ -260,7 +256,8 @@ def read_control_dataset(filter_with_text = True):
 
 if __name__ == '__main__':
 
-    encoder = cache_embeddings(to_train)
+    controls = read_control_dataset()
+    encoder = cache_embeddings(controls)
 
     tf.reset_default_graph()
     session = tf.Session()
