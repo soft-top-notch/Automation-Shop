@@ -7,6 +7,9 @@ import os
 import numpy as np
 import traceback
 import time
+import functools
+
+from tracing.rl.actions import Nothing, Wait
 
 
 class Environment:
@@ -345,13 +348,22 @@ class Environment:
         return (image - 128.0) / 128.0
 
     
-    # Returns input images for different controls
     def get_controls(self):
+        """
+        :return:   Returns ordered controls for current frame
+        """
+        def cmp(ctrl1, ctrl2):
+            ydelta = ctrl1.location['y'] - ctrl2.location['y']
+            if abs(ydelta) >= 15:
+                return ydelta
+
+            return ctrl1.location['x'] - ctrl2.location['x']
+
         controls = selenium_controls.extract_controls(self.driver)
 
         # Sort by Top then by Left of control location
-        controls.sort(key = lambda ctrl: (ctrl.location['y'], ctrl.location['x']))
-        
+        controls.sort(key = functools.cmp_to_key(cmp))
+
         return controls
 
     
@@ -406,11 +418,16 @@ class Environment:
     def apply_action(self, control, action):
         # Switch to main frame 
         success = False
+        self.step += 1
+
+        if isinstance(action, Nothing) or isinstance(action, Wait):
+            success = action.apply(control, self.driver, self.user)
+            return 0
+
         try:
             if self.rewards:
                 self.try_switch_to_default()       
                 self.rewards.before_action(self.driver, action)
-            self.step += 1
 
             if self.rewards:
                  self.try_switch_to_frame()

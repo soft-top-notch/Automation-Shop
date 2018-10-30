@@ -1,7 +1,7 @@
-import logging
 import pkg_resources as res
 
 from tracing.selenium_utils.common import *
+from selenium.webdriver.common.action_chains import ActionChains
 
 
 class Types:
@@ -286,22 +286,15 @@ def click(driver, elem):
     driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
 
 
-def enter_text(driver, elem, text):
+def enter_text(elem, text):
     """
     Enters text to text field
-    :param driver:   Web driver
-    :param x:        Left for any point of the text field
-    :param y:        Top for any point of the text field
+    :param elem:     TextBox
     :param text:     Text to input
     """
-    add_scripts_if_need(driver)
-    
-    x, y = scroll_to_element(driver, elem)
-    height = elem.size['height']
-    width = elem.size['width']
-    assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
 
-    driver.execute_script('el = document.elementFromPoint({}, {}); el.value = "{}";'.format(x + width//2, y + height//2, text))
+    driver = elem.parent
+    ActionChains(driver).move_to_element(elem).click(elem).send_keys(text).perform()
 
 
 def is_visible(elem):
@@ -357,9 +350,11 @@ def get_label_with_elem(element):
             if not id:
                 continue
 
-            labels = driver.find_elements_by_css_selector('label[for="{}"]'.format(id))
+            labels = driver.find_elements_by_css_selector('label[for="{}"]'.format(id)) + \
+                driver.find_elements_by_css_selector('lable[for="{}"]'.format(id))
+
             if labels:
-                return (labels[0].get_attribute("innerText"), labels[0])
+                return (labels[0].text, labels[0])
 
         parent = element.find_element_by_xpath('..')
         if parent and parent.tag_name == "label":
@@ -408,7 +403,9 @@ def get_selects(driver):
 def get_inputs(driver):
     inputs = driver.find_elements_by_css_selector('input[type="text"]')
     searches = driver.find_elements_by_css_selector('input[type="search"]')
-    nums = driver.find_elements_by_css_selector('input[type="num"]')
+    nums = driver.find_elements_by_css_selector('input[type="num"]') + \
+         driver.find_elements_by_css_selector('input[type="number"]')
+
     tels = driver.find_elements_by_css_selector('input[type="tel"]')
     emails = driver.find_elements_by_css_selector('input[type="email"]')
     urls = driver.find_elements_by_css_selector('input[type="url"]')
@@ -428,8 +425,6 @@ def gather_click_elements(driver):
 
 
 def extract_controls(driver):
-    frames = get_frames(driver)
-    
     selects = [Control.create_select(elem) for elem in get_selects(driver)
        if is_visible(elem)]
     inputs = [Control.create_input(elem) for elem in get_inputs(driver) if is_visible(elem)]
@@ -466,12 +461,15 @@ def is_link(elem):
 
 
 def get_links(driver):
-    links = driver.find_elements_by_css_selector("a[href]")
+    links = driver.find_elements_by_css_selector("a[href]") + \
+        driver.find_elements_by_tag_name("area")
     return [link for link in links if is_link(link)]
 
 
 def get_buttons(driver):
-    links = [elem for elem in driver.find_elements_by_tag_name("a") if not is_link(elem)]
+    links = [elem for elem in (driver.find_elements_by_tag_name("a")
+                            + driver.find_elements_by_tag_name("area"))
+                               if not is_link(elem)]
     buttons = driver.find_elements_by_tag_name("button")
     inputs = driver.find_elements_by_css_selector('input[type="button"]')
     submits = driver.find_elements_by_css_selector('input[type="submit"]')

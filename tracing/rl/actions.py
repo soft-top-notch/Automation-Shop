@@ -63,14 +63,15 @@ class InputBirthday(IAction):
                     return False
 
         return True
-    
+
+
     def apply(self, ctrl, driver, user):
         if not self.is_applicable(ctrl):
             return False
                 
         if ctrl.type == Types.text:
-            enter_text(driver, ctrl.elem, self.get_contains()[0])
-            time.sleep(1)
+            enter_text(ctrl.elem, self.get_contains()[0])
+            time.sleep(5)
 
         else:
             val = None
@@ -89,7 +90,7 @@ class InputBirthday(IAction):
     
 class InputBDay(InputBirthday):
     def get_contains(self):
-        return ['1', '01', '20']
+        return ['01', '1', '20']
     
     def __str__(self):
         return "InputBDay"
@@ -146,9 +147,11 @@ class InputEmail(IAction):
         
     def apply(self, ctrl, driver, user):
         if self.is_applicable(ctrl):
-            email = user.get('email', 'test@gmail.com')
+            import uuid
+            second = uuid.uuid4().hex.upper()[0:8] + '@gmail.com'
+            email = user.get('email', second)
 
-            enter_text(driver, ctrl.elem, email)
+            enter_text(ctrl.elem, email)
             time.sleep(1)
 
             return True
@@ -167,7 +170,7 @@ class Click(IAction):
     def apply(self, ctrl, driver, user):
         if self.is_applicable(ctrl):
             click(driver, ctrl.elem)
-            time.sleep(1)
+            time.sleep(5)
             return True
         
         return False
