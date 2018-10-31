@@ -1,7 +1,6 @@
 from tracing.rl.environment import Environment
 from tracing.rl.actions import Actions
 
-import csv, re
 import PIL
 import numpy as np
 import uuid

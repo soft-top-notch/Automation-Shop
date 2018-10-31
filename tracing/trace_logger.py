@@ -75,7 +75,7 @@ Step = namedtuple('Step', ['url', 'state', 'handler', 'screen_path', 'source', '
 
 class FileTraceLogger(ITraceLogger):
 
-    def __init__(self, results_file, img_folder):
+    def __init__(self, results_file, img_folder, clear = True):
         
         self._results_file = results_file
         self._img_folder = img_folder
@@ -84,16 +84,18 @@ class FileTraceLogger(ITraceLogger):
         dirname = os.path.dirname(results_file)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        open(results_file, 'w+').close()
+        if clear:
+            open(results_file, 'w+').close()
         
         # create image folder if not exists
         if not os.path.exists(img_folder):
             os.makedirs(img_folder)
 
         # Delete all .png files in directory
-        old_files = [ f for f in os.listdir(img_folder) if f.endswith(".png") ]
-        for file in old_files:
-            os.remove(os.path.join(img_folder, file))
+        if clear:
+            old_files = [ f for f in os.listdir(img_folder) if f.endswith(".png") ]
+            for file in old_files:
+                os.remove(os.path.join(img_folder, file))
 
 
     @abstractmethod
@@ -103,12 +105,14 @@ class FileTraceLogger(ITraceLogger):
     @abstractmethod
     def save(self, trace, status):
         trace.set_status(status)
-        
+
+        json = TraceEncoder().encode(trace)
+        to_write = json + '\n'
+
         # Add json as one line to results file
         with open(self._results_file, "a") as f:
-            json = TraceEncoder().encode(trace)
-            f.write(json)
-            f.write('\n')
+            f.write(to_write)
+            f.flush()
 
 
 class FileTraceLogging(ITraceLogging):
@@ -132,7 +136,6 @@ class FileTraceLogging(ITraceLogging):
 
 
 
-from PIL import Image
 from mongoengine import *
 import datetime
         

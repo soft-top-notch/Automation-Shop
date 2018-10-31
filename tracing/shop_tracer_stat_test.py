@@ -31,19 +31,6 @@ with open('../resources/pvio_vio_us_ca_uk_sample1.csv', 'r') as f:
 random.seed(4)
 sample_urls = random.sample(all_urls, num_urls)
 
-# Some good urls to analyze by hands
-good_urls = [
-    'naturesbestrelief.com',
-    'purekindbotanicals.com',
-    'ossur.com',
-    'freshfarmscbd.com',
-    'naturesbestrelief.com',
-    'poundsandinchesaway.com',
-    'bluespringsanimalhospital.com',
-    'mikestvbox.com',
-]
-
-
 @contextmanager
 def get_tracer(headless, processer_num = 0):
     logger = trace_logger.FileTraceLogger('log/results_{}.jsonl'.format(processer_num), 
