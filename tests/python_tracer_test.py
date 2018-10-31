@@ -5,18 +5,20 @@ import sys
 
 sys.path.insert(0, '../tracing')
 
+import common_actors
+import user_data
+
+from rl.environment import *
 from shop_tracer import *
 from selenium_helper import *
 from trace_logger import *
-import common_actors
-import user_data
 from datetime import datetime
-
 from contextlib import contextmanager
 
 @contextmanager
 def get_tracer(headless=False):
-    tracer = ShopTracer(user_data.get_user_data, headless=headless)
+    env = Environment(user = user_data.get_user_data, headless=headless)
+    tracer = ShopTracer(environment = env)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
@@ -50,7 +52,7 @@ with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()
-        status = tracer.trace(url, 60, attempts=3, delaying_time=10)
+        status = tracer.trace(url, 60, attempts=3, delaying_time=2)
         new_time = datetime.now()
 
         if status.state == States.purchased:

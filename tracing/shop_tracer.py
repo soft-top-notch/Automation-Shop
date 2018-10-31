@@ -1,12 +1,14 @@
 import logging
 import traceback
-from abc import abstractmethod
 import requests
+import user_data
 import selenium
 
-from tracing.common_heuristics import *
-from tracing.selenium_utils.common import *
-from tracing.status import *
+from rl.environment import *
+from abc import ABCMeta, abstractmethod
+from common_heuristics import *
+from selenium_helper import *
+from status import *
 
 
 class States:
@@ -17,9 +19,10 @@ class States:
     cart_page = "cart_page"
     checkout_page = "checkout_page"
     payment_page = "payment_page"
+    iframe_page = "iframe_page"
     purchased = "purchased"
 
-    states = [new, shop, product_page, product_in_cart, cart_page, checkout_page, payment_page, purchased]
+    states = [new, shop, product_in_cart, cart_page, product_page, checkout_page, iframe_page, purchased]
 
 
 class TraceContext:
@@ -37,7 +40,7 @@ class TraceContext:
 
     @property
     def driver(self):
-        return self.tracer._driver
+        return self.tracer.environment.driver
 
     def on_started(self):
         assert not self.is_started, "Can't call on_started when is_started = True"
@@ -70,27 +73,36 @@ class TraceContext:
     def log_step(self, handler, additional = None):
         if not self.trace:
             return
-        
-        self.trace.save_snapshot(self.driver, self.state, handler, additional)
 
 
-class IStepActor:
+class IEnvActor:
 
-    def __init__(self):
-        pass
+    @abstractmethod
+    def get_states(self):
+        """
+        States for actor
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def filter_page(self, driver, state, context):
         return True
 
     @abstractmethod
-    def process_page(self, driver, state, context):
+    def get_action(self, control):
+        """
+        Should return an action for every control
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def get_states(self):
+    def get_state_after_action(self, is_success, state, control, environment):
+        """
+        Should return a new state or the old state
+        Also should return wheather environmenet should discard last action
+        """
         raise NotImplementedError
-
+    
     def can_handle(self, driver, state, context):
         states = self.get_states()
 
@@ -99,18 +111,50 @@ class IStepActor:
 
         return self.filter_page(driver, state, context)
 
-    def act(self, driver, state, context):
-        step = self.process_page(driver, state, context)
-        return step
+
+class ISiteActor:
+
+    @abstractmethod
+    def get_states(self):
+        """
+        States for actor
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def filter_page(self, driver, state, context):
+        return True
+
+    @abstractmethod
+    def get_action(self, environment):
+        """
+        Should return an action for whole site
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_state_after_action(self, is_success, state, environment):
+        """
+        Should return a new state or the old state
+        Also should return wheather environmenet should discard last action
+        """
+        raise NotImplementedError
+    
+    def can_handle(self, driver, state, context):
+        states = self.get_states()
+
+        if states and state not in states:
+            return False
+
+        return self.filter_page(driver, state, context)
 
 
 class ShopTracer:
     def __init__(self,
-                 get_user_data,
+                 environment,
                  chrome_path='/usr/bin/chromedriver',
-                 headless=False,
                  # Must be an instance of ITraceSaver
-                 trace_logger = None
+                 trace_logger = None,
                  ):
         """
         :param get_user_data: Function that should return tuple (user_data.UserInfo, user_data.PaymentInfo)
@@ -120,19 +164,18 @@ class ShopTracer:
         :param trace_logger:  ITraceLogger instance that could store snapshots and source code during tracing
         """
         self._handlers = []
-        self._get_user_data = get_user_data
+        self._get_user_data = environment.user
         self._chrome_path = chrome_path
         self._logger = logging.getLogger('shop_tracer')
-        self._headless = headless
-        self._driver = None
+        self._headless = environment.headless
         self._trace_logger = trace_logger
+        self.environment = environment
 
     def __enter__(self):
         pass
     
     def __exit__(self, type, value, traceback):
-        if self._driver:
-            self._driver.quit()
+        self.environment.__exit__(type, value, traceback)
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -172,47 +215,62 @@ class ShopTracer:
         self._driver = driver
 
         return driver
+    
+    def apply_actor(self, actor, state):
+        if actor.__class__.__name__ == "SearchForProductPage":
+            action = actor.get_action(self.environment)
+            is_success,_ = self.environment.apply_action(None, action)
+            new_state = actor.get_state_after_action(is_success, state, self.environment)
 
-    def process_state(self, driver, state, context):
+            if new_state != state:
+                return new_state
+        else:
+            while self.environment.has_next_control():
+                ctrl = self.environment.get_next_control()
+                action = actor.get_action(ctrl)
+
+                if action.__class__.__name__ == "Nothing":
+                    continue
+                is_success,_ = self.environment.apply_action(ctrl, action)
+
+                if is_success:
+                    current_state = (
+                        get_url(self.environment.driver),
+                        self.environment.c_idx,
+                        self.environment.f_idx
+                    )
+                    self.environment.states.append(current_state)
+                new_state, discard = actor.get_state_after_action(is_success, state, ctrl, self.environment)
+                
+                # Discard last action
+                if discard:
+                    self.environment.discard()
+                    
+                if new_state != state:
+                    return new_state        
+        return state
+
+    def process_state(self, state, context):
         # Close popups if appeared
-        close_alert_if_appeared(self._driver)
+        close_alert_if_appeared(self.environment.driver)
 
         handlers = [(priority, handler) for priority, handler in self._handlers
-                    if handler.can_handle(driver, state, context)]
+                    if handler.can_handle(self.environment.driver, state, context)]
 
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
 
         for priority, handler in handlers:
-            frames = get_frames(driver)
-                
-            if len(frames) > 1 and state == States.new:
-                self._logger.info('found {} frames'.format(len(frames) - 1))
+            self.environment.reset_control()
+            self._logger.info('handler {}'.format(handler))
+            new_state = self.apply_actor(handler, state)
 
-            frames_number = len(frames)
-            for i in range(frames_number):
-                if len(frames) > 1 and is_stale(frames[-1]):
-                    frames = get_frames(driver)
+            self._logger.info('new_state {}, url {}'.format(new_state, get_url(self.environment.driver)))
+            assert new_state is not None, "new_state is None"
 
-                if len(frames) <= i:
-                    break
-
-                frame = frames[i]
-
-                with Frame(driver, frame):
-                    self._logger.info('handler {}'.format(handler))
-                    new_state = handler.act(driver, state, context)
-                    close_alert_if_appeared(self._driver)
-                    self._logger.info('new_state {}, url {}'.format(new_state, get_url(driver)))
-
-                    assert new_state is not None, "new_state is None"
-
-                    context.on_handler_finished(new_state, handler)            
-
-                    if new_state != state:
-                        return new_state
-
+            if new_state != state:
+                return new_state
         return state
 
     def trace(self, domain, wait_response_seconds = 60, attempts = 3, delaying_time = 10):
@@ -222,11 +280,13 @@ class ShopTracer:
         :param domain:                 Shop domain to trace
         :param wait_response_seconds:  Seconds to wait response from shop
         :param attempts:               Number of attempts to navigate to checkout page
-        :return:                       ITracingStatus
+        :return:                       ICrawlingStatus
         """
 
         result = None
         best_state_idx = -1
+        time_to_sleep = 2
+
         for _ in range(attempts):
             attempt_result = self.do_trace(domain, wait_response_seconds, delaying_time)
 
@@ -242,36 +302,32 @@ class ShopTracer:
 
             if not result:
                 result = attempt_result
-
+            time.sleep(time_to_sleep)
+            time_to_sleep = 2 * time_to_sleep
         return result
 
     def do_trace(self, domain, wait_response_seconds = 60, delaying_time = 10):
-
-        url = ShopTracer.normalize_url(domain)
-
-        driver = self.get_driver()
         state = States.new
-
-        user_info, payment_info = self._get_user_data()
+        user_info, payment_info = self._get_user_data
 
         context = TraceContext(domain, user_info, payment_info, delaying_time, self)
             
         try:
-            status = ShopTracer.get(driver, url, wait_response_seconds)
-            
-            if status:
-                return status
+            status = None
 
+            if not self.environment.start(domain):
+                return "Error is occured in starting environment"
+            
             context.on_started()   
             assert context.is_started
             
-            if is_domain_for_sale(driver, domain):
+            if is_domain_for_sale(self.environment.driver, domain):
                 return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
 
             while state != States.purchased:
-                new_state = self.process_state(driver, state, context)
+                new_state = self.process_state(state, context)
 
                 if state == new_state:
                     break
@@ -279,10 +335,10 @@ class ShopTracer:
                 state = new_state
                 
         except:
-            self._logger.exception("Unexpected exception during processing {}".format(url))
+            self._logger.exception("Unexpected exception during processing {}".format(domain))
             exception = traceback.format_exc()
             status = ProcessingStatus(state, exception)
-        
+
         finally:
             if not status:
                 status = ProcessingStatus(state)

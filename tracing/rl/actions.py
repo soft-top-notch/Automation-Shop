@@ -1,3 +1,6 @@
+import random
+
+from selenium.webdriver.common.keys import Keys
 from tracing.selenium_utils.controls import *
 from abc import abstractmethod
 
@@ -12,6 +15,23 @@ class IAction:
 
     @abstractmethod
     def is_applicable(self, control):
+        """
+        Returns True or False whether the action could be applied to control
+        """
+        raise NotImplementedError()
+
+
+class ISiteAction:
+    
+    @abstractmethod
+    def apply(self, driver, user):
+        """
+        Returns True or False if action was applied successfuly
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def is_applicable(self, driver):
         """
         Returns True or False whether the action could be applied to control
         """
@@ -153,6 +173,91 @@ class Nothing(IAction):
         return "Do Nothing"
 
 
+class SearchProductPage(ISiteAction):
+    def is_applicable(self, driver):
+        return True
+
+    def search_in_google(self, driver, query):
+        driver.get('https://www.google.com')
+        time.sleep(3)
+
+        search_input = driver.find_element_by_css_selector('input.gsfi')
+        search_input.clear()
+        search_input.send_keys(query)
+        search_input.send_keys(Keys.ENTER)
+        time.sleep(3)
+
+        links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
+        if len(links) > 0:
+            return [link.get_attribute("href") for link in links]
+        else:
+            return None
+
+    def search_in_bing(self, driver, query):
+        driver.get('https://www.bing.com')
+        time.sleep(3)
+
+        search_input = driver.find_element_by_css_selector('input.b_searchbox')
+        search_input.clear()
+        search_input.send_keys(query)
+        search_input.send_keys(Keys.ENTER)
+        time.sleep(3)
+        
+        links = driver.find_elements_by_css_selector('ol#b_results > li.b_algo > h2 > a[href]')
+        
+        if len(links) > 0:
+            return [link.get_attribute("href") for link in links]
+        else:
+            return None
+
+    def search_for_product_link(self, driver):
+        queries = ['"add to cart"']
+        url_domain = driver.current_url.split("/")
+        domain = url_domain[0] + "//" + url_domain[2]
+        # Open a new tab
+        try:
+            new_tab(driver)
+            for query in queries:
+                google_query = 'site:{} {}'.format(domain, query)
+
+                searches = [self.search_in_bing, self.search_in_google]
+                for search in searches:
+                    try:
+                        links = search(driver, google_query)
+                        if links:
+                            return links
+
+                    except:
+                        logger = logging.getLogger('shop_tracer')
+                        logger.exception('during search in search engine got an exception')
+
+        finally:
+            # Close new tab
+            close_tab(driver)
+
+        return links
+
+    def apply(self, ctrl, driver, user):
+        links = self.search_for_product_link(driver)
+
+        if links:
+            links = list(links)
+
+            driver.get(links[0])
+            time.sleep(3)
+            return True
+        return False
+
+
 class Actions:
-    actions = [InputBDay(), InputBMonth(), InputBYear(), Click(), InputEmail(), Nothing()]
+    actions = [
+        InputBDay(),
+        InputBMonth(),
+        InputBYear(),
+        Click(),
+        Wait(),
+        SearchProductPage(),
+        InputEmail(),
+        Nothing()
+    ]
 
