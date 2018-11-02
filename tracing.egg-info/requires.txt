@@ -1,0 +1,12 @@
+requests
+lxml
+image
+Pillow
+scipy
+mongoengine
+pika
+configparser
+selenium
+beautifulsoup4
+tensorflow
+tracing
