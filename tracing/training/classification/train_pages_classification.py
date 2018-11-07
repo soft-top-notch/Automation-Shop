@@ -1,10 +1,3 @@
-from tracing.rl.actions import *
-from tracing.rl.a3cmodel import A3CModel
-from tracing.rl.rewards import PopupRewardsCalculator
-from tracing.rl.environment import Environment
-from tracing.rl.actor_learner import ActionsMemory
-from tracing.rl.actor_learner import ActorLearnerWorker
-
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets as nets
@@ -16,6 +9,7 @@ import csv, re
 import random
 import PIL
 
+import os
 import numpy as np
 import random
 import sys
