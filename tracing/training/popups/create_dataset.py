@@ -13,6 +13,8 @@ import uuid
 from queue import Queue
 
 import scipy.misc as misc
+from PIL import Image
+
 
 num_threads = 8
 resources = '../../../resources/'
@@ -42,11 +44,14 @@ def str_to_dataset_item(line):
     }
 
 
-def load_dataset(dataset_file):
+def load_dataset(dataset_file, imgs_path = None):
     result = []
     with open(dataset_file, 'r') as f:
         for row in f:
             item = str_to_dataset_item(row.strip())
+            if imgs_path:
+                item['img_file'] = os.path.join(imgs_path, item['img_file'])
+
             result.append(item)
     
     return result
@@ -84,11 +89,11 @@ def create_small_picture(url, width=300):
     small_file = get_small_picture(file)
     if not os.path.isfile(small_file):
         # Resize image
-        img = PIL.Image.open(file)
+        img = Image.open(file)
         scale = width / float(img.size[0])
 
         height = int((img.size[1] * scale))
-        img = img.resize((width, height), PIL.Image.ANTIALIAS)
+        img = img.resize((width, height), Image.ANTIALIAS)
         img.save(small_file)
 
 

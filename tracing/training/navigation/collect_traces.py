@@ -7,6 +7,7 @@ from queue import Queue
 import csv
 from contextlib import contextmanager
 import os.path
+import traceback
 
 
 threads = 8
@@ -84,8 +85,13 @@ class Processor:
             while True:
                 url = queue.get()
                 if url not in results:
-                    status = tracer.trace(url, attempts=3, delaying_time=delay)
-                    Processor.save_result(url, status)
+                    try:
+                        status = tracer.trace(url, attempts=1, delaying_time=delay)
+                        Processor.save_result(url, status)
+                    except:
+                        print('\n\nhigh level exception:')
+                        traceback.print_exc()
+                        continue
 
                 queue.task_done()
 

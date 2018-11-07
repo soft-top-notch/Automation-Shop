@@ -39,7 +39,11 @@ class ITraceLogging:
     
     @abstractmethod
     def create_img_file(self):
-        return tempfile.mkstemp(suffix = '.png')[1]
+        fd, file_name = tempfile.mkstemp(suffix = '.png')
+        file = os.fdopen(fd,'w')
+        file.close()
+
+        return file_name
     
     @abstractmethod
     def add_step(self, url, state, handler, screenshot_file, source, additional = None):
@@ -51,7 +55,7 @@ class ITraceLogging:
             self._scale = get_scale(driver)
             
         url = get_url(driver)
-        html = driver.page_source
+        html = get_source(driver)
         
         screenshot_file = self.create_img_file()
         get_full_page_screenshot(driver, screenshot_file, self._scale, 10)
@@ -104,6 +108,10 @@ class FileTraceLogger(ITraceLogger):
 
     @abstractmethod
     def save(self, trace, status):
+        """
+        :param trace:    ITraceLogging - collected trace
+        :param status:   ITraceStatus  - final status
+        """
         trace.set_status(status)
 
         json = TraceEncoder().encode(trace)

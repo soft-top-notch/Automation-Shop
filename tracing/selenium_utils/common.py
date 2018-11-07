@@ -10,7 +10,7 @@ import time
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
-from selenium.webdriver.support.expected_conditions import staleness_of
+from selenium.common.exceptions import UnexpectedAlertPresentException
 
 
 os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
@@ -63,7 +63,20 @@ def get_url(driver, attempts = 2):
             return None
     except:
         return None
-    
+
+
+def get_source(driver, attempts = 2):
+    try:
+        return driver.page_source
+    except UnexpectedAlertPresentException:
+        if attempts > 1:
+            close_alert_if_appeared(driver)
+            return get_source(driver, attempts - 1)
+        else:
+            return None
+    except:
+        return None
+
 
 def is_stale(elem):
     try:
@@ -242,7 +255,7 @@ def create_chrome_driver(chrome_path='/usr/bin/chromedriver', headless=True, siz
     if headless:
         options.add_argument('--headless')
     
-    options.add_argument('--no-sandbox')
+    #options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
 
     options.add_argument("--disable-infobars")

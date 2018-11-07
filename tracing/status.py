@@ -27,6 +27,7 @@ class ITraceStatus:
         return json.dumps(self, default=lambda o: o.__dict__, 
             sort_keys=True, indent=4)
 
+
 class NotAvailable(ITraceStatus):
     """
         Status for shop that are not available
