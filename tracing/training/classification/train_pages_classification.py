@@ -65,7 +65,7 @@ class PageClassifier:
         
     
     def build_graph(self, is_training):
-        with tf.variable_scope('page_classification') as sc:
+        with tf.device('/gpu:0'), tf.variable_scope('page_classification') as sc:
             self.dropout = tf.placeholder(tf.float32, (), "dropout")
             self.lr = tf.placeholder(tf.float32, (), "lr")
             self.l2 = tf.placeholder(tf.float32, (), "l2")
@@ -79,7 +79,7 @@ class PageClassifier:
             self.is_checkout_task = tf.placeholder(tf.bool, [None], "is_checkout")
             
 
-        with slim.arg_scope(inception_resnet_v2_arg_scope()):
+        with tf.device('/gpu:0'), slim.arg_scope(inception_resnet_v2_arg_scope()):
             self.net, endpoints = nets.inception_resnet_v2.inception_resnet_v2(
                    self.img, None, dropout_keep_prob = 1.0, is_training = is_training, reuse=tf.AUTO_REUSE)
 
@@ -205,7 +205,7 @@ class PageClassifier:
         }
     
     
-    def train(self, imgs, epochs = 10, lr = 0.001, dropout = 0.8, l2 = 0.001):
+    def train(self, imgs, epochs = 10, lr = 0.001, dropout = 0.8, l2 = 0.001, batch_size=12):
         
         print('dataset size:', len(imgs))
         for epoch in range(epochs):
@@ -213,7 +213,7 @@ class PageClassifier:
             random.shuffle(imgs)
             sum_loss = 0
             loss_cnts = 0
-            for batch in self.split(imgs):
+            for i, batch in enumerate(self.split(imgs, batch_size)):
                 feed = self.batch_to_feed(batch)
                 feed[self.lr] = lr
                 feed[self.dropout] = dropout
@@ -223,7 +223,11 @@ class PageClassifier:
                     [self.train_op, self.loss, self.popup_loss, self.checkout_loss], 
                                            feed_dict = feed)
                 
-                print('loss: {}, popup_loss: {}, checkout_loss: {}'.format(loss, popup_loss, checkout_loss))
+
+                sys.stdout.write('\rfinished: {:2.2f}% loss: {}, popup_loss: {}, checkout_loss: {}'
+.format(i * batch_size * 100 /len(imgs), loss, popup_loss, checkout_loss))
+                sys.stdout.flush()
+
                 sum_loss += loss
                 loss_cnts += 1
             
@@ -310,17 +314,19 @@ print('train checkouts size: ', len(train_checkouts))
 print('test checkouts size: ', len(test_checkouts))
 
 train_urls = train_popups + train_checkouts
-test_urls = train_checkouts + test_checkouts
+test_urls = test_popups + test_checkouts
 
 random.shuffle(train_urls)
 random.shuffle(test_urls)
 
 
 tf.reset_default_graph()
-session = tf.Session()
+#session = tf.Session()
+session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
 
-classifier = PageClassifier(session)
-session.run(tf.global_variables_initializer())
+with tf.device('/gpu:0'):
+    classifier = PageClassifier(session)
+    session.run(tf.global_variables_initializer())
 
 saver = tf.train.Saver()
 classifier.restore_inception('./inception_resnet_v2_2016_08_30.ckpt')
@@ -337,18 +343,17 @@ if checkpoint:
     print('loading checkpoint', checkpoint)
     saver.restore(session, checkpoint)
 
-train_urls = train_urls[:30]
-test_urls = test_urls[:30]
+#train_urls = train_urls
+#test_urls = test_urls
 
 for epoch in range(start_epoch, 100):
     print('epoch ', epoch)
-    classifier.train(train_urls, epochs=1, lr = 0.0001, dropout = 1.0)# 0.65)
+    classifier.train(train_urls, epochs=1, lr = 0.0001, dropout = 0.75)
     train_f1 = classifier.measure(train_urls)
     print('train f1:', train_f1)
     
     test_f1 = classifier.measure(test_urls)
     print('test f1:', test_f1)
     
-    if epoch % 10 == 9:
-        saver.save(session, 'classification_model/{}'.format(epoch))
+    saver.save(session, 'classification_model/{}'.format(epoch))
 
