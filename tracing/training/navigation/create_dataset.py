@@ -6,24 +6,35 @@ import PIL
 from PIL import Image
 import sys
 
+from tracing.utils.dataset import *
 
 
-def load_dataset(dataset_file = 'checkout_dataset.csv', imgs_path = None):
-    result = []
-    with open(dataset_file, 'r') as f:
-        for line in f:
-            state, domain, url, file_name = line.strip().split('\t')
-            
-            if imgs_path:
-                file_name = os.path.join(imgs_path, file_name)
-            
-            item = {
-                'is_checkout': state == 'checkout_page',
-                'img_file': file_name
-            }
-            result.append(item)
-    
-    return result
+class CheckoutsDataset(IDataset):
+    def __init__(self, items = None, file = None):
+        super().__init__(items, file)
+
+    def line2item(self, line):
+        state, domain, url, file_name = line.strip().split('\t')
+
+        return {
+            'is_checkout': state == 'checkout_page',
+            'img_file': file_name,
+            'domain': domain,
+            'state': state,
+            'url': url
+        }
+
+    def item2line(self, item):
+        state = item['state']
+        domain = item['domain']
+        url = item['url']
+        file_name = item['img_file']
+        
+        return "{}\t{}\t{}\t{}".format(state, domain, url, file_name)
+
+    @staticmethod
+    def read(file):
+        return CheckoutsDataset(file = file)
 
 
 def is_img(file):
@@ -36,8 +47,8 @@ def is_img(file):
     except IOError:
         return False
 
-    
-def sample(file, 
+
+def sample(file,
                 sample_from_path_to_checkout = 5, 
                 sample_from_non_checkout = 5.0):
     
@@ -52,6 +63,7 @@ def sample(file,
     checkout_pages = 0
     
     with open(file, 'r') as f:
+        no_checkout_pages = []
         for line_num, line in enumerate(f):
             sys.stdout.write('\r Processed lines: {}'.format(line_num))
             sys.stdout.flush()
@@ -62,6 +74,7 @@ def sample(file,
                 continue
             
             trace_state = trace['status']['state']
+            print(trace_state)
             if trace_state == 'checkout_page' or trace_state == 'purchased':
                 checkout_pages += 1
                 
@@ -81,15 +94,12 @@ def sample(file,
                             break
                             
                         path.append((line_num, i))
-                
-                
+
                 if len(path) <= sample_from_path_to_checkout:
                     result.extend(path)
                 else:
                     sample = random.sample(path, sample_from_path_to_checkout)
                     result.extend(sample)
-                    
-                    
             else:
                 for i, step in enumerate(trace['steps']):
                     if not is_img(step['screen_path']):
@@ -124,8 +134,8 @@ def create_small_picture(img_file, dst_folder, width=300):
 def construct_dataset(file, 
                       sample_from_path_to_checkout = 5.0, 
                       sample_from_non_checkout = 5.0, 
-                      destination = 'checkout_dataset.csv', 
-                      destination_imgs ='checkout_dataset_imgs'):
+                      destination = 'checkout_dataset/meta.csv',
+                      destination_imgs ='checkout_dataset/imgs'):
 
     if not os.path.exists(destination_imgs):
         os.makedirs(destination_imgs)
@@ -175,11 +185,11 @@ def construct_dataset(file,
 
 if __name__ == '__main__':
     print('started creatign checkouts dataset')
-    construct_dataset('log/results.jsonl', 
+    construct_dataset('log/results.jsonl',
                       sample_from_path_to_checkout = 5.0, 
                       sample_from_non_checkout = 5.0, 
-                      destination = 'checkout_dataset.csv', 
-                      destination_imgs ='checkout_dataset_imgs')
+                      destination = 'checkout_dataset/meta.csv',
+                      destination_imgs ='checkout_dataset/imgs')
     print('dataset constructed')
     print('analyze it and correct labels with jupyter notebook')
 

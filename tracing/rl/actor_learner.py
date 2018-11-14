@@ -157,7 +157,7 @@ class ActorLearnerWorker(threading.Thread):
 
         lstm_state = None
         action_id = len(Actions.actions) - 1
-        while not self.env.is_final() and self.env.has_next_controls():
+        while not self.env.is_final() and self.env.has_next_control():
             print('control:', str(ctrl)[:100])
             ctrl = self.env.get_next_control()
             inp = self.env.get_control_as_input(ctrl)

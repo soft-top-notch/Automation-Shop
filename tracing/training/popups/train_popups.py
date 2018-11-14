@@ -2,14 +2,15 @@ from tracing.rl.actions import *
 from tracing.rl.a3cmodel import A3CModel
 from tracing.rl.rewards import PopupRewardsCalculator
 from tracing.rl.environment import Environment
+from tracing.rl.actor_learner import ActionsMemory
 from tracing.rl.actor_learner import ActorLearnerWorker
 import tensorflow as tf
 import threading
+import csv, re
 import random
-import os
 
-from create_dataset import load_dataset
-from queue import Queue
+from create_dataset import read_popups_rl_dataset
+from tracing.training.classification.page_classifier import PageClassifier
 
 
 os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
@@ -22,7 +23,7 @@ pretrained_checkpoint = '../pretrain/checkpoints/pretrain_checkpoint-10'
 assert os.path.isfile(dataset_file), 'Dataset file {} is not exists'.format(dataset_file)
 
 
-urls = load_dataset(dataset_file)
+urls = read_popups_rl_dataset(dataset_file)
 
 popup_urls = list([status['url'] for status in urls if status['has_popup']==True])
 random.shuffle(popup_urls)
@@ -34,14 +35,21 @@ test_urls = popup_urls[split:]
 print('train size: ', len(train_urls))
 print('test size: ', len(test_urls))
 
+
+g1 = tf.Graph()
+with g1.as_default():
+    page_classifier = PageClassifier.get_pretrained('/home/aleksei/work/projects/g2/cache')
+
+
 tf.reset_default_graph()
 session = tf.Session()
 
-num_workers = 16
+#num_workers = 16
+num_workers = 4
 
 # Do input Birth Day, Month, Year and Email
 # Do it for training Speedup
-fixed_probas = {0: 1., 1: 1., 2:1., 4:1.}
+fixed_probas = {0: 1., 1: 1., 2: 1., 4: 1.}
 
 global_model = A3CModel(len(Actions.actions), session = session, train_deep = True, fixed_gate_probas = fixed_probas)
 session.run(tf.global_variables_initializer())
@@ -52,7 +60,7 @@ if pretrained_checkpoint:
 workers = []
 
 for i in range(num_workers):
-    env = Environment(PopupRewardsCalculator(), user={}, headless=True)
+    env = Environment(PopupRewardsCalculator(page_classifier), user={}, headless=True)
     worker = ActorLearnerWorker("worker-{}".format(i),
                                 train_urls,
                                 global_model, 
@@ -127,6 +135,7 @@ def start_acting(worker):
         reward = worker.act(url)
         if reward is None:
             continue
+
 
         tested += 1
         if reward > 0:

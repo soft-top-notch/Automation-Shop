@@ -1,60 +1,70 @@
-from tracing.rl.rewards import PopupRewardsCalculator
-from tracing.rl.environment import Environment
+from tracing.rl.rewards import HeuristicPopupRewardsCalculator
 import tracing.selenium_utils.common as common
 
 import threading
 import csv, re
-import random
 import traceback
 import time
-import os, os.path
-import json
+import os.path
 import uuid
 from queue import Queue
-
-import scipy.misc as misc
-from PIL import Image
+from tracing.utils.dataset import *
 
 
 num_threads = 8
-resources = '../../../resources/'
 queue = Queue()
-dataset_file = resources + 'popups_dataset.csv'
-img_folder = 'popups_dataset_imgs/'
+resources = '../../../resources/'
+dataset_path = 'popups_dataset'
 
 
 def dataset_item_to_str(item):
     return '{}\t{}\t{}\t{}\t{}'.format(
-        item['url'], 
-        item['has_popup'], 
-        item['img_file'], 
+        item['url'],
+        item['has_popup'],
+        item['img_file'],
         item['author'],
-        item['to_classify']
+        item.get('to_classify', True)
     )
 
 
 def str_to_dataset_item(line):
     parts = line.split('\t')
     return {
-       'url': parts[0],
-       'has_popup': parts[1] == 'True',
-       'img_file': parts[2],
-       'author': parts[3],
-       'to_classify': len(parts) == 4 or parts[4] == 'True'
+        'url': parts[0],
+        'has_popup': parts[1] == 'True',
+        'img_file': parts[2],
+        'author': parts[3],
+        'to_classify': len(parts) == 4 or parts[4] == 'True'
     }
 
-
-def load_dataset(dataset_file, imgs_path = None):
+def read_popups_rl_dataset(file):
     result = []
-    with open(dataset_file, 'r') as f:
+    with open(file, 'r') as f:
         for row in f:
             item = str_to_dataset_item(row.strip())
-            if imgs_path:
-                item['img_file'] = os.path.join(imgs_path, item['img_file'])
+            if item:
+                result.append(item)
 
-            result.append(item)
-    
     return result
+
+
+class PopupsDataset(IDataset):
+    def __init__(self, items = None, file = None):
+        super().__init__(items, file)
+
+    def line2item(self, str):
+        item = str_to_dataset_item(str)
+        if "img_file" in item:
+            return item
+
+        return None
+
+    def item2line(self, item):
+        return dataset_item_to_str(item)
+
+    @staticmethod
+    def read(file):
+        return PopupsDataset(file=file)
 
 
 def create_driver():
@@ -69,75 +79,6 @@ def create_driver():
     raise Exception("can't create driver")
 
 
-def read_small_image(url):
-    file = url['img_file']
-    assert os.path.isfile(file)
-    create_small_picture(url)
-    return misc.imread(get_small_picture(file))
-    
-
-def get_small_picture(file):
-    assert file[-4:] == '.png', 'file format {} is not supported only png'.format(file)
-    first_part = file[:-4]
-    
-    return first_part + '_small.png'
-
-
-def create_small_picture(url, width=300):
-    file = url['img_file']
-    
-    small_file = get_small_picture(file)
-    if not os.path.isfile(small_file):
-        # Resize image
-        img = Image.open(file)
-        scale = width / float(img.size[0])
-
-        height = int((img.size[1] * scale))
-        img = img.resize((width, height), Image.ANTIALIAS)
-        img.save(small_file)
-
-
-def create_small_pictures(urls, width=300):
-    for i, url in enumerate(urls):
-        if not os.path.isfile(url['img_file']):
-            continue
-
-        create_small_picture(url)
-        
-        if i % 100 == 0:
-            print('{}% is finished'.format(i*100./len(urls)))
-
-
-def is_empty(file):
-    array = misc.imread(file)
-    return np.all(array == array[0,0])
-
-
-def filter_empty_imgs(dataset):
-    urls = load_dataset(dataset)
-    tmp = dataset + '.tmp'
-    empty = 0
-    with open(tmp, 'w') as f:
-        for url in urls:
-            file = url['img_file']
-            if not os.path.isfile(file):
-                empty += 1
-                continue
-
-            if is_empty(file):
-                empty += 1
-                continue
-            
-            line = dataset_item_to_str(url)
-            f.write(line + '\n')
-            f.flush()
-        
-    print('found empty pictures: ', empty)
-
-    os.rename(tmp, dataset)
-    
-    
-    
 class UrlPopupsChecker:
     
     def __init__(self, dataset_file, img_folder, already_read):
@@ -145,7 +86,6 @@ class UrlPopupsChecker:
         self.dataset_file = dataset_file
         self.img_folder = img_folder
         self.already_read = {item['url']: True for item in already_read}
-    
 
     def run(self):
         while True:
@@ -166,18 +106,16 @@ class UrlPopupsChecker:
 
         self.already_read[url] = status
 
-
     def get_img_file(self):
         file_name = str(uuid.uuid4()) + '.png'
         return os.path.join(self.img_folder, file_name)
-    
-    
+
     def check_url(self, url):
         result = self.already_read.get(url)
         if result is not None:
             return result
 
-        rewards = PopupRewardsCalculator()
+        rewards = HeuristicPopupRewardsCalculator()
         has_popup = False
         for _ in range(3):
             try:
@@ -201,32 +139,39 @@ class UrlPopupsChecker:
         }
         
 
-def create_popup_dataset(dataset_file, reuse_cache = True):
+def create_popup_dataset(dataset_path, reuse_cache = True):
     
-    if os.path.isfile(dataset_file):
-        return load_dataset(dataset_file)
-    
+    if os.path.isdir(dataset_path):
+        return PopupsDataset.read(dataset_path)
+
     print('started creating dataset...')
         
     smoke_urls = []
     pattern = '.*((smok)|(cig)|(vap)|(tobac)).*'
     with open(resources + 'pvio_vio_us_ca_uk_sample1.csv') as f:
         rows = csv.reader(f)
+        cnt = 0
         for row in rows:
             url = row[0]
             if re.match(pattern, url):
                 smoke_urls.append(url)
-                
+                cnt += 1
+                if cnt > 100:
+                    break
 
     print('Found {} urls'.format(len(smoke_urls)))
     
-    tmp_file = dataset_file + '.tmp'
-    if os.path.isfile(tmp_file) and reuse_cache:
-        processed = load_dataset(tmp_file)
-        print('read from previous run cache {} urls'.format(len(processed)))
+    tmp_path = dataset_path + '.tmp'
+    img_folder = os.path.join(tmp_path, 'imgs')
+    dataset_file = os.path.join(tmp_path, "meta.csv")
+
+    if os.path.isdir(tmp_path) and reuse_cache:
+        processed = PopupsDataset.read(tmp_path)
+        print('read from previous run cache {} urls'.format(len(processed.items)))
     else:
-        with open(tmp_file, 'w') as f:
-            pass
+        os.mkdir(tmp_path)
+        os.mkdir(img_folder)
+        open(dataset_file, 'w').close()
         processed = []
 
     if not os.path.isdir(img_folder):
@@ -236,7 +181,7 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
         queue.put(url)
 
     for i in range(num_threads):
-        checker = UrlPopupsChecker(tmp_file, img_folder, processed)
+        checker = UrlPopupsChecker(dataset_file, img_folder, processed)
         t = threading.Thread(target=checker.run)
         t.daemon = True
         t.start()
@@ -252,21 +197,23 @@ def create_popup_dataset(dataset_file, reuse_cache = True):
     print('wait for the rest')
     queue.join()
 
-    os.rename(tmp_file, dataset_file)
+    os.rename(tmp_path, dataset_path)
     
-    return load_dataset(dataset_file)
+    return PopupsDataset.read(dataset_path)
 
 
 if __name__ == '__main__':
     os.environ['DBUS_SESSION_BUS_ADDRESS'] = '/dev/null'
-    extracted_popup_urls = create_popup_dataset(dataset_file)
-    
+    dataset = create_popup_dataset(dataset_path)
+
     print('filtering empty images')
-    filter_empty_imgs(dataset)
+    dataset.filter_empty_imgs()
 
     print('creating small images')
-    create_small_pictures(urls)
+    dataset.create_small_pictures(width = 300)
 
-    print('processed urls: ', len(extracted_popup_urls))
+    dataset.save()
+
+    print('processed urls: ', len(dataset.items))
 
 
