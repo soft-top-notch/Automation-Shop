@@ -1,6 +1,6 @@
 from tracing.rl.actions import *
 from tracing.rl.a3cmodel import A3CModel
-from tracing.rl.rewards import PopupRewardsCalculator
+from tracing.rl.rewards import *
 from tracing.rl.environment import Environment
 from tracing.rl.actor_learner import ActionsMemory
 from tracing.rl.actor_learner import ActorLearnerWorker
@@ -44,8 +44,7 @@ with g1.as_default():
 tf.reset_default_graph()
 session = tf.Session()
 
-#num_workers = 16
-num_workers = 4
+num_workers = 16
 
 # Do input Birth Day, Month, Year and Email
 # Do it for training Speedup
@@ -60,7 +59,7 @@ if pretrained_checkpoint:
 workers = []
 
 for i in range(num_workers):
-    env = Environment(PopupRewardsCalculator(page_classifier), user={}, headless=True)
+    env = Environment(PageRewardsCalculator.for_popups(page_classifier), user={}, headless=True)
     worker = ActorLearnerWorker("worker-{}".format(i),
                                 train_urls,
                                 global_model, 

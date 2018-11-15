@@ -31,35 +31,89 @@ class IRewardsCalculator:
         raise NotImplementedError
 
 
-class PopupRewardsCalculator(IRewardsCalculator):
+class PageRewardsCalculator(IRewardsCalculator):
 
-    def __init__(self, model, cached = True):
+    @staticmethod
+    def for_checkouts(model, cached=True):
+        return PageRewardsCalculator(
+            model,
+            "checkout",
+            big_pictures=True,
+            reached=True,
+            close_alerts=True,
+            cached=cached)
+
+    @staticmethod
+    def for_popups(model, cached=True):
+        return PageRewardsCalculator(
+            model,
+            "popup",
+            big_pictures=False,
+            reached=False,
+            close_alerts = True,
+            cached=cached)
+
+    def __init__(self,
+                 model,
+                 page_type = "popup",
+                 big_pictures = True,
+                 reached = True,
+                 close_alerts = True,
+                 cached = True):
         """
-        :param model:   PageClassifier
-        :param cached:  If true then rewards are recalculated only after action
+        :param model:     PageClassifier
+        :param page_type: "checkout" or "popup"
+        :param reached:   Return positive reward if page is reached or disappeared
+        :param cached:    If true then rewards are recalculated only after action
         """
+
         self.model = model
+        self.page_type = page_type
+        self.big_pictures = big_pictures
+        self.reached = reached
+        self.close_alerts = close_alerts
         self.cached = cached
-        self.had_popup_proba = 0.
-        self.has_popup_proba = 0.
+
+        self.goal_proba = 0.
+        self.goal_proba_prev = 0.
+
+    def get_domain(self, url):
+        return urlparse(url).netloc
 
     def start(self, driver):
-        self.has_popup_proba = self.calc_has_popup_proba(driver)
-        self.had_popup_proba = self.has_popup_proba
+        self.url = self.get_domain(driver.current_url)
+        self.new_url = self.url
+        self.alert_shown = True if common.find_alert(driver) else False
+
+        self.goal_proba = self.calc_goal_proba(driver)
+        self.goal_proba_prev = self.goal_proba
+        print('goal proba = ', self.goal_proba)
 
     def before_action(self, driver, action):
+        self.url = self.get_domain(driver.current_url)
+
         if not self.cached:
-            self.has_popup_proba = self.calc_has_popup_proba(driver)
+            self.goal_proba = self.calc_goal_proba(driver)
 
     def after_action(self, driver, action):
-        self.had_popup_proba = self.has_popup_proba
-        self.has_popup_proba = self.calc_has_popup_proba(driver)
+        self.alert_shown = common.find_alert(driver) is not None
+        if self.alert_shown and self.close_alerts:
+            common.close_alert_if_appeared(driver)
+            self.alert_shown = False
+
+        if self.alert_shown:
+            return
+
+        self.new_url = self.get_domain(driver.current_url)
+
+        self.goal_proba_prev = self.goal_proba
+        self.goal_proba = self.calc_goal_proba(driver)
 
     def is_final(self):
-        return self.has_popup_proba < 0.3
+        return self.alert_shown or self.new_url != self.url or self.goal_proba > 0.6
 
     def calc_reward(self, is_success):
-        if self.had_popup_proba - self.has_popup_proba > 0.5:
+        if not self.alert_shown and self.new_url == self.url and self.goal_proba - self.goal_proba_prev > 0.4:
             return 3
         else:
             return 0
@@ -67,7 +121,7 @@ class PopupRewardsCalculator(IRewardsCalculator):
     def calc_final_reward(self):
         return 0
 
-    def calc_has_popup_proba(self, driver):
+    def calc_goal_proba(self, driver):
 
         # 1. Create tmp file
         fd, tmp_file = tempfile.mkstemp(suffix = '.png')
@@ -76,11 +130,21 @@ class PopupRewardsCalculator(IRewardsCalculator):
 
         try:
             # 2. Get screenshot
-            common.get_screenshot(driver, tmp_file)
+            common.scroll_to_top(driver)
+            if self.big_pictures:
+                scale = common.get_scale(driver)
+                common.get_full_page_screenshot(driver, tmp_file, scale)
+            else:
+                common.get_screenshot(driver, tmp_file)
 
             # 3. Classify page
             page_info = self.model.classify_page(tmp_file)
-            return page_info["popup"]
+            proba = page_info[self.page_type]
+
+            if not self.reached:
+                proba = 1. - proba
+
+            return proba
 
         finally:
             # 4. Remove file
