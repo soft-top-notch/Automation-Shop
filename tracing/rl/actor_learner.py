@@ -6,38 +6,50 @@ import traceback
 
 
 class ActionsMemory:
-    def __init__(self, gamma):
+    def __init__(self, gamma, prev_action, is_prev_applied):
         self.imgs = []
         self.actions = []
+        self.is_action_applied = []
+
         self.rewards = []
         self.gamma = gamma
+
+        self.prev_action = prev_action
+        self.is_prev_applied = is_prev_applied
+
         self.final_score = 0
         self.possible_actions = []
+
     
     def set_final_score(self, score):
         self.final_score = score
 
+
     def size(self):
         return len(self.imgs)
 
+
     @staticmethod
     def get_possible_actions(ctrl):
-        num_actions = len(Actions.actions)
         possible_actions = []
-        for a_id, action in enumerate(Actions.actions):
+        for a_id, action in enumerate(Actions.actions[:-1]):
             is_applicable = 1 if action.is_applicable(ctrl) else 0
             possible_actions.append(is_applicable)
         
         return possible_actions        
 
-    def append(self, img, action, reward, ctrl):
+
+    def append(self, img, action, is_applied, reward, ctrl):
         self.imgs.append(img)
         self.actions.append(action)
+        self.is_action_applied.append(1 if is_applied else 0)
+
         self.rewards.append(reward)
 
         possible_actions = ActionsMemory.get_possible_actions(ctrl)
         self.possible_actions.append(possible_actions)
     
+
     def to_input(self):
         batch_size = len(self.imgs)
         rewards = [0] * batch_size
@@ -51,6 +63,7 @@ class ActionsMemory:
         return {
             "img": self.imgs,
             "actions": self.actions,
+            "is_applied": self.is_action_applied,
             "rewards": rewards,
             "possible_actions": self.possible_actions
             }
@@ -137,21 +150,33 @@ class ActorLearnerWorker(threading.Thread):
     
     
     def act(self, url):
-        passes = 0
         sum_reward = 0
-        while not self.env.is_final and self.env.has_next_controls():
+
+        if not self.env.start(url):
+            return None
+
+        lstm_state = None
+        action_id = len(Actions.actions) - 1
+        while not self.env.is_final() and self.env.has_next_control():
+            print('control:', str(ctrl)[:100])
             ctrl = self.env.get_next_control()
             inp = self.env.get_control_as_input(ctrl)
 
             pa = ActionsMemory.get_possible_actions(ctrl)
-            action_id = self.local_model.get_action(inp, pa)
+
+            action_id, to_apply, lstm_state = self.local_model.get_action(inp, pa, action_id, lstm_state, True)
+
             action = Actions.actions[action_id]
-            reward = self.env.apply_action(ctrl, action)
-            
-            sum_reward += reward * (self.gamma ** self.env.step)
-       
+            print('got action: {}, is_applying: {}'.format(action, to_apply))
+
+            if to_apply:
+                reward = self.env.apply_action(ctrl, action)            
+                sum_reward += reward * (self.gamma ** self.env.step)
+                print('reward:', reward)
+
         v_score = self.env.calc_final_reward()
         sum_reward += v_score * (self.gamma ** self.env.step)
+
         return sum_reward
 
 
@@ -160,8 +185,11 @@ class ActorLearnerWorker(threading.Thread):
         memories = []
         lstm_state = None
         state_to_train = None
+
+        action_id = len(Actions.actions) - 1
+        to_apply = False
         while True:
-            memory = ActionsMemory(gamma = self.gamma)
+            memory = ActionsMemory(self.gamma, action_id, to_apply)
             memories.append(memory)
             
             while not self.env.is_final() and self.env.has_next_control():
@@ -170,16 +198,19 @@ class ActorLearnerWorker(threading.Thread):
 
                 print('control:', str(ctrl)[:100])
                 pa = ActionsMemory.get_possible_actions(ctrl)
-                action_id, lstm_state = self.local_model.get_action(inp, pa, lstm_state, True)
+                action_id, to_apply, lstm_state = self.local_model.get_action(inp, pa, action_id, lstm_state, True)
 
                 action = Actions.actions[action_id]
-                print('got action:', action)
-                        
-                reward = self.env.apply_action(ctrl, action)
+ 
+                print('got action: {}, is_applying: {}'.format(action, to_apply))
 
-                print('reward:', reward)
+                if to_apply:
+                    reward = self.env.apply_action(ctrl, action)
+                    print('reward:', reward)
+                else:
+                    reward = 0
                 
-                memory.append(inp, action_id, reward, ctrl)
+                memory.append(inp, action_id, to_apply, reward, ctrl)
                 sum_reward += reward * (self.gamma ** self.env.step)
                 
                 if memory.size() % self.n_step == 0:
@@ -192,10 +223,9 @@ class ActorLearnerWorker(threading.Thread):
             else:
                 # Find next element
                 ctrl = self.env.get_next_control(move=False)
-
                 inp = self.env.get_control_as_input(ctrl)
 
-                v_score = self.local_model.estimate_score(inp, lstm_state) * self.gamma
+                v_score = self.local_model.estimate_score(inp, action_id, lstm_state) * self.gamma
 
             memory.set_final_score(v_score)
             

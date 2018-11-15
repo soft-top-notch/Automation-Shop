@@ -1,16 +1,12 @@
-import nlp
-import time
-import logging
 import random
-import sys
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
-sys.path.insert(0, '..')
-
 from tracing.selenium_utils.common import *
 from tracing.selenium_utils.controls import *
+import tracing.nlp as nlp
+
 
 
 def get_label_text_with_attribute(driver, elem):
@@ -31,7 +27,6 @@ def get_label_text_with_attribute(driver, elem):
         ).lower()
     except:
         label_text = ""
-        pass
 
     return label_text
 

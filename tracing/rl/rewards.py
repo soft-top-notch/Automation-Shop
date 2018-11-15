@@ -3,6 +3,8 @@ import random
 import tracing.selenium_utils.controls as selenium_controls
 import tracing.selenium_utils.common as common
 from urllib.parse import urlparse
+import tempfile
+import os
 
 
 class IRewardsCalculator:
@@ -30,6 +32,62 @@ class IRewardsCalculator:
 
 
 class PopupRewardsCalculator(IRewardsCalculator):
+
+    def __init__(self, model, cached = True):
+        """
+        :param model:   PageClassifier
+        :param cached:  If true then rewards are recalculated only after action
+        """
+        self.model = model
+        self.cached = cached
+        self.had_popup_proba = 0.
+        self.has_popup_proba = 0.
+
+    def start(self, driver):
+        self.has_popup_proba = self.calc_has_popup_proba(driver)
+        self.had_popup_proba = self.has_popup_proba
+
+    def before_action(self, driver, action):
+        if not self.cached:
+            self.has_popup_proba = self.calc_has_popup_proba(driver)
+
+    def after_action(self, driver, action):
+        self.had_popup_proba = self.has_popup_proba
+        self.has_popup_proba = self.calc_has_popup_proba(driver)
+
+    def is_final(self):
+        return self.has_popup_proba < 0.3
+
+    def calc_reward(self, is_success):
+        if self.had_popup_proba - self.has_popup_proba > 0.5:
+            return 3
+        else:
+            return 0
+
+    def calc_final_reward(self):
+        return 0
+
+    def calc_has_popup_proba(self, driver):
+
+        # 1. Create tmp file
+        fd, tmp_file = tempfile.mkstemp(suffix = '.png')
+        file = os.fdopen(fd,'w')
+        file.close()
+
+        try:
+            # 2. Get screenshot
+            common.get_screenshot(driver, tmp_file)
+
+            # 3. Classify page
+            page_info = self.model.classify_page(tmp_file)
+            return page_info["popup"]
+
+        finally:
+            # 4. Remove file
+            os.remove(tmp_file)
+
+
+class HeuristicPopupRewardsCalculator(IRewardsCalculator):
     
     def __init__(self):
         self.is_final_state = False
@@ -114,8 +172,6 @@ class PopupRewardsCalculator(IRewardsCalculator):
             return 0
         elif self.had_popup and not self.have_popup:
             return 3
-        elif not is_success:
-            return 0#-1
         else:
             return 0
     
@@ -124,5 +180,5 @@ class PopupRewardsCalculator(IRewardsCalculator):
             return 0
         else:
             # Haven't close popup
-            return 0#-3
+            return 0
 
