@@ -9,7 +9,7 @@ import common_actors
 import user_data
 
 from rl.environment import *
-from shop_tracer import *
+from heuristic.shop_tracer import *
 from selenium_helper import *
 from trace_logger import *
 from datetime import datetime
