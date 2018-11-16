@@ -115,6 +115,13 @@ window.__tra_selectComboboxValue = async function(left, top, width, height, text
     }
 }
 
+//Returns true if it is a DOM element
+window.__tra_is_element = function(o){
+  return (
+    typeof HTMLElement === "object" ? o instanceof HTMLElement : //DOM2
+    o && typeof o === "object" && o !== null && o.nodeType === 1 && typeof o.nodeName==="string"
+);
+}
 
 window.__tra_gatherClickElements = function(curnode, gathered) {
     if (!curnode)
@@ -122,7 +129,8 @@ window.__tra_gatherClickElements = function(curnode, gathered) {
     if(!gathered) 
         gathered = [];
     
-    if (typeof curnode.onclick === 'function')
+    if (typeof curnode.onclick === 'function' ||
+            __tra_is_element(curnode) && getComputedStyle(curnode).getPropertyValue('cursor') == 'pointer')
         gathered.push(curnode);
     
     curnode.childNodes.forEach(function(child) {

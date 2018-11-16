@@ -2,11 +2,9 @@ from tracing.rl.actions import *
 from tracing.rl.a3cmodel import A3CModel
 from tracing.rl.rewards import *
 from tracing.rl.environment import Environment
-from tracing.rl.actor_learner import ActionsMemory
 from tracing.rl.actor_learner import ActorLearnerWorker
 import tensorflow as tf
 import threading
-import csv, re
 import random
 
 from create_dataset import read_popups_rl_dataset
