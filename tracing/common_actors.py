@@ -68,11 +68,14 @@ class AddToCart(IEnvActor):
 
         if control.type not in [controls.Types.link, controls.Types.button]:
             return Nothing()
-        text = control.elem.get_attribute('outerHTML')
+        try:
+            text = control.elem.get_attribute('outerHTML')
 
-        if nlp.check_text(text, self.contains, self.not_contains):
-            return Click()
-        else:
+            if nlp.check_text(text, self.contains, self.not_contains):
+                return Click()
+            else:
+                return Nothing()
+        except:
             return Nothing()
 
     def get_state_after_action(self, is_success, state, control, environment):
@@ -216,785 +219,8 @@ class ToCheckout(IEnvActor):
             if self.discard_count == 0:
                 self.discard_count += 1
                 return (state, True)
-        return (States.checkout_page, False)
-
-
-class PaymentFields(IEnvActor):
-    def get_states(self):
-        return [States.checkout_page]
-
-    def check_login_exist(self, driver, context):
-        '''
-            Check login requiring in checkout page
-        '''
-        password_fields = driver.find_elements_by_css_selector("input[type='password']")
-        logger = logging.getLogger("shop_tracer")
-
-        if password_fields:
-            if len(password_fields) >= 2:
-                return True
-            if password_fields[0].is_displayed():
-                radio_or_check_continue = find_radio_or_checkbox_buttons(
-                    driver,
-                    ["guest", "create*.*later", "copy*.*ship",
-                    "copy*.*bill", "skip*.*login", "register"]
-                )
-                if not radio_or_check_continue and \
-                    not self.find_guest_continue_button(
-                        driver,
-                        ["continue", "checkout", "check out",
-                        "(\s|^)go(\s|$)","new.*.customer"],
-                        ["login", "continue shopping", "cart",
-                        "logo", "return", "signin"]
-                    ):
-                    if not self.new_account_field_exist(driver,
-                        ["guest", "(no|without|free|create).*account",
-                        "account.*.(no|without|free)"],
-                        ["login","signin","sign in"],
-                        password_fields[0]):
-                        logger.debug("We can't use this url! Login password required!")
-                        return False
-        return True
-
-    def filter_page(self, driver, state, context):
-        return_flag = True
-
-        if not self.check_login_exist(driver, context):
-            return_flag = False
-
-        return return_flag
-
-    def simply_click_one_element(self, elements):
-        '''
-            Simply click one element in elements
-        '''
-        for element in elements:
-            if element.is_displayed():
-                try:
-                    element.click()
-                    time.sleep(2)
-                    return True
-                except:
-                    pass
-        return False
-
-
-    def find_select_element(self, driver, contain, consider_contain=None):
-        '''
-            Find select elements containing content of contain parameter.
-        '''
-        selects = driver.find_elements_by_css_selector("select")
-        selected_sels = []
-        pass_once = False
-        content = contain
-
-        if consider_contain:
-            if content == consider_contain[0]:
-                content = consider_contain[1]
-                pass_once = True
-
-        for sel in selects:
-            try:
-                label_text = get_label_text_with_attribute(driver, sel)
-            except:
-                continue
-            not_contains = []
-            if content == "state":
-                not_contains = ["unitedstate"]
-            elif content == "ex":
-                not_contains = ["state", "country", "express"]
-            if nlp.check_text(label_text, [content], not_contains):
-                if pass_once:
-                    pass_once = False
-                    continue
-                selected_sels.append(sel)
-        return selected_sels
-
-
-    def find_guest_continue_button(self, driver, contains, not_contains):
-        '''
-            Find guest or continue button in case the password input field exist in checkout page 
-        '''
-        pass_button = []
-
-        text_element = find_text_element(
-            driver,
-            ["guest", "(no|without|free|create).*account",
-            "account.*.(no|without|free)"])
-
-        if text_element:
-            for button in find_buttons_or_links(driver, contains, not_contains):
-                if button.get_attribute("href") and \
-                    button.get_attribute("href") in normalize_url(get_url(driver)):
-                    continue
-                pass_button.append(button)
-
-            if not pass_button:
-                pass_button = get_no_href_buttons(
-                    driver,
-                    ["forgot.*.password"],
-                    ["cart", "logo", "return", "continue shopping"])
-
-        return pass_button
-
-
-    def new_account_field_exist(self, driver, contains, not_contains, create_new_field):
-        text_element = find_text_element(driver, contains, not_contains)
-
-        if text_element:
-            root_element = text_element.find_element_by_xpath("../..")
-
-            try:
-                password_element = root_element.find_element_by_css_selector("input[type='password']")
-
-                if password_element and password_element == create_new_field:
-                    return True
-            except:
-                pass
-
-        return False
-
-
-    def process_select_option(self, driver, contains, context):
-            '''
-                Find select elements containing content of contains parameter
-                and choose exact option with context
-            '''
-            result_cnt = 0
-
-            for item in contains:
-                selects = self.find_select_element(driver, item, ['ex1', 'ex'])
-                if not selects:
-                    continue
-                for sel in selects:
-                    try:
-                        flag = False
-                        for option in sel.find_elements_by_css_selector("option"):
-                            text = option.text + " " + option.get_attribute("innerHTML").strip()
-                            ctns  = []
-
-                            if item == "country":
-                                ctns = ["united states"]
-                            elif item == "day":
-                                ctns = ["27"]
-                            elif item == "state":
-                                ctns = [
-                                    nlp.normalize_text(get_name_of_state(context.user_info.state)),
-                                    "(^|\s){}$".format(nlp.normalize_text(context.user_info.state))
-                                ]
-                            else:
-                                ctns = [
-                                    nlp.normalize_text(context.payment_info.card_type),
-                                    "(\d\d|^){}$".format(context.payment_info.expire_date_year),
-                                    "(^|-|_|\s|\d){}".format(nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)])),
-                                    context.payment_info.expire_date_month
-                                ]
-                            if nlp.check_text(text, ctns):
-                                try:
-                                    option.click() # select() in earlier versions of webdriver
-                                    time.sleep(context.delaying_time - 1)
-                                    result_cnt += 1
-                                    flag = True
-                                    break
-                                except:
-                                    break
-                        if flag:
-                            break
-                    except:
-                        continue
-            return result_cnt
-
-
-    def input_fields_in_checkout(self,
-                                driver,
-                                context,
-                                select_contains,
-                                extra_contains,
-                                is_userInfo=True,
-                                not_extra_contains=None,
-                                not_contains=None
-                                ):
-        '''
-            Choose select option and fill input fields.
-            select_contains:
-                find select options containing content of this parameter
-            extra_contains:
-                optimize attribute text by using content of this parameter
-            is_userInfo:
-                True: fill user information fields
-                False: fill payment information field
-        '''
-
-        logger = logging.getLogger('shop_tracer')
-
-        inputed_fields = []
-        cycle_count = 0
-        address_cnt = 0
-        confirm_pwd = False
-        index = 0
-
-        selected_count = self.process_select_option(driver, select_contains, context)
-        if not selected_count:
-            logger.debug("Not found select options!")
-
-        input_texts = driver.find_elements_by_css_selector("input")
-        input_texts += driver.find_elements_by_css_selector("textarea")
-        time.sleep(context.delaying_time - 1)
-
-        if is_userInfo:
-            json_Info = context.user_info.get_json_userinfo()
-            confirm_pwd = False
-        else:
-            json_Info = context.payment_info.get_json_paymentinfo()
-            confirm_pwd = True
-
-        while index < len(input_texts):
-            label_text = ""
-            try:
-                if input_texts[index].is_displayed() and \
-                    not nlp.check_text(input_texts[index].get_attribute("type"),
-                    ["button", "submit", "radio", "checkbox", "image"]):
-                    label_text = get_label_text_with_attribute(driver, input_texts[index])
-
-                if not label_text:
-                    index += 1
-                    continue
-            except:
-                if cycle_count >= 2:
-                    cycle_count = 0
-                    index += 1
-                    continue
-                input_texts = driver.find_elements_by_css_selector("input")
-                input_texts += driver.find_elements_by_css_selector("textarea")
-                cycle_count += 1
-                continue
-
-            for conItem in extra_contains:
-                not_text_contains = not_extra_contains
-                if conItem[0] == "comp":
-                    not_text_contains = not_text_contains + ["complete"]
-                if nlp.check_text(label_text, conItem[0].split(","), not_text_contains):
-                    if conItem[1] == "number" and nlp.check_text(label_text, ["verif.*"]):
-                        conItem[1] = "cvc"
-                    label_text += " " + conItem[1]
-                    break
-            for key in json_Info.keys():
-                if key in inputed_fields:
-                    continue
-                _not_contains = not_contains
-                if key == "type":
-                    _not_contains = _not_contains + ["typehere"]
-                elif key == "city":
-                    _not_contains = _not_contains + ["opacity"]
-                elif key == "number":
-                    _not_contains = _not_contains + ["verif.*", "number\d"]
-                if nlp.check_text(label_text.replace("name=", " ").replace("type=", " "), [nlp.remove_letters(key, [" "])], _not_contains):
-                    try:
-                        input_texts[index].click()
-                        input_texts[index].clear()
-                    except:
-                        driver.execute_script("arguments[0].click();",input_texts[index])
-                        input_texts[index].clear()
-                        pass
-                    try:
-                        if key == "phone":
-                            if nlp.check_text(input_texts[index].get_attribute("outerHTML"), ["email"]):
-                                continue
-                            input_texts[index].send_keys(nlp.remove_letters(json_Info[key], ["(", ")", "-"]))
-                        elif key == "country":
-                            input_texts[index].send_keys("united states")
-                        elif key == "state":
-                            input_texts[index].send_keys(nlp.normalize_text(get_name_of_state(context.user_info.state)))
-                        elif key == "number":
-                            input_texts[index].send_keys(json_Info[key])
-                            input_texts[index].clear()
-                            input_texts[index].send_keys(json_Info[key])
-                            time.sleep(context.delaying_time + 1)
-                        else:
-                            input_texts[index].send_keys(json_Info[key])
-
-                        if not is_userInfo and key == "zip":
-                            time.sleep(context.delaying_time)
-                        time.sleep(context.delaying_time - 1)
-                    except:
-                        break
-
-                    inputed_fields.append(key)
-                    if (key == "password" and not confirm_pwd) or (key == "email") or (key == "street"):
-                        if key == "street":
-                            if address_cnt >= 1:
-                                break
-                            address_cnt += 1
-                        confirm_pwd = True
-                        inputed_fields.pop()
-                    break
-            index += 1
-
-        if len(inputed_fields) == 1 and inputed_fields[0] == "zip":
-            return len(inputed_fields) - 1
-        return len(inputed_fields)
-
-
-    def check_error(self, driver, context):
-        '''
-            Check error elements after clicking continue(order) button
-        '''
-        logger = logging.getLogger('shop_tracer')
-        error_result = []
-        try:
-            error_elements = find_error_elements(driver, ["error", "err", "alert", "advice", "fail", "invalid"], ["override"])
-        except:
-            if nlp.check_alert_text(driver, ["decline", "duplicate", "merchant", "transaction"]):
-                return 2
-            return 0
-        time.sleep(context.delaying_time - 1)
-
-        required_fields = driver.find_elements_by_css_selector("input")
-        required_fields += driver.find_elements_by_css_selector("select")
-
-        if error_elements:
-            if len(error_elements) == 1 and nlp.check_text(
-                error_elements[0].get_attribute("outerHTML"),
-                ["credit", "merchant", "payment", "security","transaction", "decline", "permit", "authenticat"],
-                ["find", "require"]):
-                return 2
-            elif len(error_elements) == 2 and nlp.check_text(error_elements[1].get_attribute("outerHTML"), ["password"]):
-                return 1
-            
-            if len(error_elements) <= 3:
-                for error in error_elements:
-                    if nlp.check_text(
-                        error.get_attribute("outerHTML"),
-                        ["already have an account with this email address",
-                        "couldn't be verified",
-                        "inactive for a while"]):
-                        return 2
-
-            while True:
-                try:
-                    for element in error_elements:
-                        text = nlp.remove_letters(element.get_attribute("innerHTML").strip(), ["/", "*", "-", "_", ":", " "]).lower()
-                        for field in required_fields:
-                            if field.is_displayed():
-                                label_text = get_label_text_with_attribute(driver, field)
-                                if label_text and nlp.check_text(text, [label_text]):
-                                    error_result.append(label_text + " field required")
-                        if not error_result:
-                            contain = ["password", "company", "first", "last", "address",
-                                        "street", "city", "state", "zip", "phone",
-                                        "email", "town", "cvc", "ccv", "credit"]
-                            for item in contain:
-                                not_contains = []
-                                contains = [item]
-                                if item == "address":
-                                    not_contains = ["phone", "email"]
-                                elif item == "state":
-                                    contains.append("city")
-                                    not_contains = ["\d+"]
-                                elif item == "credit":
-                                    contains.append("card")
-                                if nlp.check_text(text, contains, not_contains):
-                                    if item == "credit":
-                                        item += " card"
-                                    elif item == "first" or item == "last":
-                                        item += " name"
-                                    error_result.append(item + " field not correct or required")
-                    break
-                except:
-                    error_elements = find_error_elements(driver, ["error", "err", "alert", "advice", "fail"], ["override"])
-                    time.sleep(context.delaying_time - 1)
-                    pass
-
-            if not error_result:
-                logger.debug("Input data not correct")
-            for elem in error_result:
-                if "password" in elem:
-                    return 1
-            return 0
-        return 1
-
-
-    def check_agree_and_click(self, driver):
-        '''
-            Find radio and checkboxes for proceed and click
-        '''
-        agree_btns = find_radio_or_checkbox_buttons(
-            driver,
-            ["agree", "terms","same", "copy",
-            "different", "register", "remember", "keep", "credit",
-            "stripe", "mr", "standard", "free", "deliver",
-            "billing_to_show", "ground", "idt", "gender"],
-            ["express"]
-        )
-        cycle_count = 0
-        index = 0
-
-        if agree_btns:
-            while index < len(agree_btns):
-                try:
-                    check_exception = agree_btns[index].get_attribute("outerHTML")
-                except:
-                    if cycle_count >= 2:
-                        cycle_count = 0
-                        index += 1
-                        continue
-                    agree_btns = find_radio_or_checkbox_buttons(
-                        driver,
-                        ["agree", "terms", "same", "copy",
-                        "different", "remember", "keep", "credit", "stripe",
-                        "register", "mr", "standard", "free", "deliver",
-                        "billing_to_show", "ground", "idt", "gender"],
-                        ["express"]
-                    )
-                    cycle_count += 1
-                    continue
-
-                if nlp.check_text(agree_btns[index].get_attribute("outerHTML"), ["diff", "register"]):
-                    if not nlp.check_text(agree_btns[index].get_attribute("outerHTML"), ["radio", "same"]):
-                        if agree_btns[index].is_displayed() and agree_btns[index].is_selected():
-                            click_radio_or_checkout_button(driver, agree_btns[index])
-                    elif nlp.check_text(agree_btns[index].get_attribute("outerHTML"), ["radio"]):
-                        if nlp.check_text(agree_btns[index].get_attribute("outerHTML"), ["same"], ["to differ"]):
-                            click_radio_or_checkout_button(driver, agree_btns[index])
-                else:
-                    if agree_btns[index].is_enabled() and not agree_btns[index].is_selected():
-                        click_radio_or_checkout_button(driver, agree_btns[index])
-                index += 1
-
-        agree_btns = find_radio_or_checkbox_buttons(
-            driver,
-            ["paypal"],
-            ["express", "differ", "register"]
-        )
-        cycle_count = 0
-        index = 0
-
-        if agree_btns:
-            while index < len(agree_btns):
-                try:
-                    check_exception = agree_btns[index].get_attribute("outerHTML")
-                except:
-                    if cycle_count >= 2:
-                        cycle_count = 0
-                        index += 1
-                        continue
-                    agree_btns = find_radio_or_checkbox_buttons(
-                        driver,
-                        ["paypal"],
-                        ["express", "differ", "register"]
-                    )
-                    cycle_count += 1
-                    continue
-
-                if agree_btns[index].is_enabled() and not agree_btns[index].is_selected():
-                    click_radio_or_checkout_button(driver, agree_btns[index])
-                index += 1
-
-    def fill_billing_address(self, driver, context):
-        '''
-            Fill user fields with user information in checkout page
-        '''
-        select_contains = ["country", "state", "zone"]
-        not_extra_contains = [
-            "email", "firstname",
-            "lastname", "street", "city",
-            "company", "country", "state", "search"
-        ]
-        extra_contains = [
-            ["(^|_|-|\s)fname,namefirst,username,first_name", "firstname"],
-            ["(^|_|-|\s)lname,namelast,last_name", "lastname"],
-            ["comp", "company"],
-            ["post", "zip"],
-            ["address,apartment,atp.", "street"]
-        ]
-        not_contains = [
-            "phone(_|-|)(\w|\w\w|\w\w\w|)(2|3)"
-        ]
-
-        return self.input_fields_in_checkout(
-            driver,
-            context,
-            select_contains,
-            extra_contains,
-            True,
-            not_extra_contains,
-            not_contains
-        )
-
-    def fill_payment_info(self, driver, context):
-        '''
-            Fill payment fields with payment information in checkout page
-        '''
-        select_contains = ["card", "month", "year", "day", "ex", "ex1"]
-        not_extra_contains = ["company"]
-        extra_contains = [
-            ["owner", "name"],
-            ["cc.*n,c\w+(num|num\w+),cardinput", "number"],
-            ["comp", "company"],
-            ["birth,(\w\w|\d\d)/(\w\w|\d\d)/(\w\w|\d\d|\d\d\d\d|\w\w\w\w)", "birthdate"],
-            ["mm(|\w+)yy,(\w\w|\d\d)/(\w\w|\d\d)", "expdate"],
-            ["exp", "expdate"],
-            ["verif.*,sec.*,cv,cc(\w|)c,csc,card(\w+|\s|)code", "cvc"],
-            ["post", "zip"]
-        ]
-        not_contains = [
-            "first", "last", "phone", "company",
-            "fname", "lname", "user", "email",
-            "address", "street", "city",
-            "gift", "vat", "filter"
-        ]
-
-        pay_result = self.input_fields_in_checkout(
-            driver,
-            context,
-            select_contains,
-            extra_contains,
-            False,
-            not_extra_contains = not_extra_contains,
-            not_contains=not_contains
-        )
-
-        if pay_result == 3:
-            return 0
-        return pay_result
-
-    def click_to_order(self, driver, context):
-        '''
-            Click pay or order button after filling user or payment fields.
-        '''
-        logger = logging.getLogger('shop_tracer')
-        return_flag = True
-        is_paymentinfo = False
-        is_userinfo = False
-        first_agree = False
-        allow_fill_payment = True
-        payment_url = None
-        try_cnt = 0
-
-        while True:
-            if try_cnt >= 6:
-                logger.debug("Error found in filling all fields")
-                return_flag = False
-                break
-
-            if not first_agree:
-                self.check_agree_and_click(driver)
-                first_agree = True
-
-            if not is_userinfo and self.fill_billing_address(driver, context):
-                    is_userinfo = True
-                    context.log_step("Fill user information fields")
-                    time.sleep(context.delaying_time - 1)
-
-            div_btns = find_elements_with_attribute(driver, "div", "class", "shipping_method")
-
-            if div_btns:
-                div_btns[0].click()
-                time.sleep(context.delaying_time - 1)
-
-            if allow_fill_payment and not is_paymentinfo:
-                if self.fill_payment_info(driver, context):
-                    is_paymentinfo = True
-                    context.log_step("Fill payment info fields")
-
-                else:
-                    if self.check_iframe_and_fill(driver, context):
-                        is_paymentinfo = True
-                        context.log_step("Fill payment info fields")
-            order = get_no_href_buttons(
-                driver,
-                ["order", "pay", "checkout", "payment", "buy"],
-                ["add", "modify", "coupon", "express",
-                "continu", "border", "proceed", "review",
-                "guest", "complete", "detail", "\.paypal\.",
-                "currency", "histor", "amazon", "summary toggle"], 2
-            )
-
-            if order:
-                break
-
-            continue_btns = get_no_href_buttons(driver,
-                ["continu", "next", "proceed", "complete"],
-                ["login", "cancel"]
-            )
-            flag = False
-
-            if continue_btns:
-                try:
-                    continue_btns[len(continue_btns) - 1].click()
-                except:
-                    flag = True
-                    pass
-            if flag or not continue_btns:
-                continue_btns = get_no_href_buttons(
-                    driver,
-                    ["bill", "proceed", "(\s|^)pay", "submit", "create*.*account",
-                    "add", "save", "select shipping option"],
-                    ["modify", "express", "cancel", "login", "sign in"]
-                )
-
-                if not continue_btns:
-                    if is_userinfo or is_paymentinfo:
-                        logging.debug("Proceed button not found!")
-                    return_flag = False
-                    break
-                try:
-                    continue_btns[len(continue_btns) - 1].click()
-                except:
-                    driver.execute_script("arguments[0].click();",continue_btns[len(continue_btns) - 1])
-                    pass
-            time.sleep(context.delaying_time * 3)
-            checked_error = self.check_error(driver, context)
-
-            if not checked_error:
-                logging.debug("Error found in checking!")
-                return_flag = False
-                break
-            elif checked_error == 1:
-                if nlp.check_alert_text(driver, ["decline", "duplicate", "merchant", "transaction"]):
-                    return True
-                purchase_text = get_page_text(driver)
-                if nlp.check_text(purchase_text, ["being process", "logging"]):
-                    time.sleep(context.delaying_time - 1)
-                elif nlp.check_text(purchase_text, ["credit card to complete your purchase", "secure payment page"]):
-                    return True
-            elif checked_error == 2:
-                return True
-
-            allow_fill_payment = False
-            self.check_agree_and_click(driver)
-            allow_number = check_filling_fields_required(driver)
-
-            if allow_number == 1:
-                is_userinfo = False
-            elif allow_number == 2:
-                allow_fill_payment = True
-            elif allow_number == 3:
-                is_userinfo = False
-                allow_fill_payment = True
-            
-            if allow_number != 3 and allow_number != 2:
-                page_text = get_page_text(driver)
-
-                if nlp.check_text(page_text.lower(), ["cardholder", "card number", "expire"]):
-                    allow_fill_payment = True
-            try_cnt += 1
-
-        if not return_flag:
-            return False
-
-        if order[0].get_attribute("href") and not "java" in order[0].get_attribute("href"):
-            payment_url = order[0].get_attribute("href")
-
-        #paying or clicking place order
-        try:
-            order[0].click()
-        except:
-            driver.execute_script("arguments[0].click();", order[0])
-            pass
-
-        time.sleep(context.delaying_time * 2)
-
-        if nlp.check_alert_text(driver, ["decline", "duplicate", "merchant", "transaction"]):
-            return True
-
-        checked_error = self.check_error(driver, context)
-
-        if not checked_error:
-            return False
-        elif checked_error == 2:
-            return True
-
-        #paying if payment info is not inputed
-        if payment_url:
-            driver.get(payment_url)
-
-        if not is_paymentinfo:
-            for _ in range(0, 3):
-                pay_buttons = []
-                if not self.fill_payment_info(driver, context) \
-                    and not self.check_iframe_and_fill(driver, context):
-                    logging.debug("Payment information is already inputed or payment field not exist!")
-                else:
-                    is_paymentinfo = True
-                    context.log_step("Fill payment info fields")
-
-                if return_flag:
-                    pay_buttons = get_no_href_buttons(driver, ["pay", "order", "submit"], ["border"], 2)
-                if pay_buttons:
-                    self.check_agree_and_click(driver)
-                    if not self.simply_click_one_element(pay_buttons):
-                        if self.click_continue_in_iframe(driver):
-                            return_flag = True
-                            continue                        
-                        logging.debug("Pay or order button error!")
-                        return_flag = False
-                    else:
-                        return_flag = True
-                        time.sleep(context.delaying_time - 1)
-                else:
-                    if not self.click_continue_in_iframe(driver):
-                        return_flag = False
-                    else:
-                        return_flag = True
-        checked_error = self.check_error(driver, context)
-
-        if return_flag or checked_error == 2:
-            return_flag = True
-        elif not return_flag and checked_error == 1:
-            blog_text = get_page_text(driver)
-            if nlp.check_text(blog_text, ["thank(s|)\s.*purchase"]):
-                return_flag = True
-        return return_flag
-
-
-    def process_page(self, driver, state, context):
-        radio_pass = find_radio_or_checkbox_buttons(
-            driver,
-            ["guest", "create*.*later", "copy*.*ship",
-            "copy*.*bill", "skip*.*login", "register"]
-        )
-
-        if radio_pass:
-            #click an radio as guest....
-            if not click_first(driver, radio_pass):
-                return state
-            time.sleep(context.delaying_time - 1)
-
-        continue_pass = self.find_guest_continue_button(
-            driver,
-            ["continue", "checkout", "check out",
-            "(\s|^)go(\s|$)","new.*.customer"],
-            ["login", "continue shopping", "cart",
-            "logo", "return", "signin"]
-        )
-
-        if continue_pass:
-            #Fill email field if exist...
-            guest_email = []
-
-            for email in driver.find_elements_by_css_selector("input[type='email']"):
-                if can_click(email):
-                    guest_email.append(email)
-
-            if guest_email:
-                for g_email in guest_email:
-                    g_email.send_keys(context.user_info.email)
-                time.sleep(context.delaying_time - 1)
-            #click continue button for guest....
-            try:
-                continue_pass[0].click()
-            except:
-                driver.execute_script("arguments[0].click();", continue_pass[0])
-                pass
-            time.sleep(context.delaying_time - 1)
-
-        #the case if authentication is not requiring....
-        filling_result = self.click_to_order(driver, context)
-        if not filling_result:
-            return state
-
-        return States.purchased
+        # return (States.fillCheckoutPage, False)
+        return (States.checkoutLoginPage, False)
 
 
 class SearchForProductPage(ISiteActor):
@@ -1013,14 +239,380 @@ class SearchForProductPage(ISiteActor):
         return state
 
 
+class CheckoutLogin(IEnvActor):
+    contains = ['continue', 'proceed', 'ahead']
+    not_contains = [
+        'login', 'signin', 'log-in', 'sign-in', 'register',
+    ]
+    guest_found = False
+
+    def __str__(self):
+        return "CheckoutLogin"
+
+    def reset_flags(self):
+        self.guest_found = False
+        return
+
+    def get_states(self):
+        return [States.checkoutLoginPage]
+
+    def get_action(self, control):
+        if control.type not in [controls.Types.link, controls.Types.button, controls.Types.radiobutton]:
+            return Nothing()
+
+        # text = control.elem.get_attribute('outerHTML')
+
+        if control.label and nlp.check_text(control.label, ['guest', 'skip login'], self.not_contains):
+            self.guest_found = True
+            return Click()
+        elif self.guest_found and control.label and nlp.check_text(control.label, self.contains, self.not_contains):
+            return Click()
+        elif control.label and "place order" in control.label.lower():
+            return MarkAsSuccess()
+
+        else:
+            return Nothing()
+
+    def get_state_after_action(self, is_success, state, control, environment):
+        if not is_success:
+            return (state, False)
+        try:
+            if nlp.check_text(control.label, self.contains, self.not_contains) or \
+            "place order" in control.label.lower():
+                return (States.fillCheckoutPage, False)
+        except: pass
+
+        return (state, False)
+
+
+class FillingCheckoutPage(ISiteActor):
+    type_list = [
+        controls.Types.text, controls.Types.select, controls.Types.button, 
+        controls.Types.link, controls.Types.radiobutton
+    ]
+    contains = ['continue', 'payment', 'proceed', 'bill & ship']
+    not_contains = ['amazon', 'paypal']
+    state_control = None
+    country_found = False
+
+    def __str__(self):
+        return "FillingCheckoutPage"
+
+    def get_states(self):
+        return [States.fillCheckoutPage]
+
+    def get_action(self, control):
+        if control.type not in type_list:
+            return Nothing()
+
+        if control.type == controls.Types.text:
+            if not control.label:
+                return Nothing()
+
+            text = control.elem.get_attribute('outerHTML')
+            if nlp.check_text(text, ['first-name', 'first_name', 'first name', 'firstname', 'f_name', 'f-name', 'fname'], ['last_name']):
+                return InputCheckoutFields("first_name")
+            elif nlp.check_text(text, ['last-name', 'last_name', 'last name', 'lastname', 'l_name', 'l-name', 'lname'], ['first_name']):
+                return InputCheckoutFields("last_name")
+            elif nlp.check_text(text, ['email', 'e-mail', 'e_mail'], ['name']):
+                return InputEmail()
+            elif nlp.check_text(text, ['street', 'road', 'address', 'apartment'], ['mail']):
+                return InputCheckoutFields("street")
+            elif 'country' in text:
+                return InputCheckoutFields("country")
+            elif nlp.check_text(text, ['town', 'city'], ['mail']):
+                return InputCheckoutFields("city")
+            elif nlp.check_text(text, ['state', 'province', 'division'], ['mail']):
+                return InputCheckoutFields("state")
+            elif nlp.check_text(text, ['phone', 'mobile', 'telephone'], ['address']):
+                return InputCheckoutFields("phone")
+            elif nlp.check_text(text, ['post', 'zip'], ['submit']):
+                return InputCheckoutFields("zip")
+            else:
+                return Nothing()
+        elif control.type == controls.Types.select:
+            if (control.values and 'Colorado' in control.values) or \
+                    (control.label and ('state' in control.label.lower() or 'province' in control.label.lower())):
+                # return InputSelectField('select-state-name')
+                self.state_control = control
+                return Nothing()
+            elif 'United States of America' in control.values:
+                self.country_found = True
+                return InputSelectField('select-country-full')
+            elif 'United States America' in control.values:
+                self.country_found = True
+                return InputSelectField('select-country-full-short')
+            elif 'United States' in control.values:
+                self.country_found = True
+                return InputSelectField('select-country-short')
+            elif 'USA' in control.values:
+                self.country_found = True
+                return InputSelectField('select-country-short-form')
+            return Nothing()
+        elif control.type == controls.Types.radiobutton:
+            if control.label and nlp.check_text(control.label.lower(), ['credit'], ['amazon', 'paypal']):
+                return Click()
+            else:
+                return Nothing()
+        elif control.type in [controls.Types.link, controls.Types.button]:
+            if control.label and nlp.check_text(control.label.lower(), self.contains, self.not_contains):
+                return Click()
+            return Nothing()
+        else:
+            return Nothing()
+
+    def get_state_after_action(self, is_success, state, control, environment):
+        if not is_success:
+            return (state, False)
+        try:
+            if self.country_found and self.state_control:
+                environment.apply_action(self.state_control, InputSelectField('select-state-name'))
+                self.state_control = None
+                self.country_found = False
+
+            if control.label and nlp.check_text(control.label.lower(), self.contains, self.not_contains):
+                return (States.prePaymentFillingPage, False)
+        except: pass
+        return (state, False)
+
+
+class PrePaymentFillingPage(IEnvActor):
+    type_list = [controls.Types.radiobutton, controls.Types.link, controls.Types.button]
+    contains = ['continue', 'proceed', 'ahead']
+    not_contains = [
+        'login', 'signin', 'log-in', 'sign-in', 'register', 'continue shopping'
+    ]
+    card_text = ['credit card', 'credit-card', 'free']
+
+    def __str__(self):
+        return "PrePaymentFillingPage"
+
+    def get_states(self):
+        return [States.prePaymentFillingPage]
+
+    def get_action(self, control):
+        if control.type not in self.type_list:
+            return Nothing()
+
+        text = control.elem.get_attribute('outerHTML')
+
+        if (nlp.check_text(text.lower(), self.card_text + self.contains, self.not_contains)) or \
+            (control.label and nlp.check_text(control.label.lower(), self.card_text, self.not_contains)):
+            return Click()
+
+        else:
+            return Nothing()
+
+    def get_state_after_action(self, is_success, state, control, environment):
+        if not is_success:
+            return (state, False)
+        try:
+            text = control.elem.get_attribute('outerHTML')
+
+            if nlp.check_text(text.lower(), self.contains, self.not_contains):
+                return (States.fillPaymentPage, False)
+        except: pass
+
+        return (state, False)
+
+
+class FillingPaymentPage(ISiteActor):
+    type_list = [
+        controls.Types.link, controls.Types.button,
+        controls.Types.text, controls.Types.select, 
+        controls.Types.radiobutton
+    ]
+    contains = ['card type', 'credit-type']
+    not_contains = ['sign-in', 'continue shopping']
+
+    flag = True
+    card_number_filled = False
+    card_cvc_filled = False
+    card_month_filled = False
+    card_year_filled = False
+    place_order_control = None
+
+    def __str__(self):
+        return "FillingPaymentPage"
+
+    def get_filling_status(self):
+        return self.card_number_filled and self.card_cvc_filled and self.card_month_filled and self.card_year_filled
+
+    def reset_flags(self):
+        self.flag = True
+        self.card_number_filled = False
+        self.card_cvc_filled = False
+        self.card_month_filled = False
+        self.card_year_filled = False
+        self.place_order_control = None
+
+    def get_states(self):
+        return [States.fillPaymentPage]
+
+    def get_action(self, control):
+        if control.type not in self.type_list:
+            if self.place_order_control and self.get_filling_status():
+                return Click()
+            return Nothing()
+        elif self.place_order_control and self.get_filling_status():
+            return Click()
+
+        text = control.elem.get_attribute('outerHTML')
+
+        if control.type == controls.Types.text:
+            card_number_text = [
+                'cc-number', 'cc_number', 'cc number', 
+                'card number', 'card-number', 'card_number'
+            ]
+
+            if nlp.check_text(text, card_number_text, ['sign-in']):
+                self.card_number_filled = True
+                return InputPaymentTextField('card-number')
+            elif nlp.check_text(text, ['verification', 'cvc', 'cvv'], ['card-number']):
+                self.card_cvc_filled = True
+                return InputPaymentTextField('cvc')
+            elif ('month' in text and 'year' in text) or ('mm' in text and 'yy' in text):
+                self.card_month_filled = True
+                self.card_year_filled = True
+                return InputPaymentTextField('input-card-month-year')
+            elif 'month' in text:
+                self.card_month_filled = True
+                return InputPaymentTextField('input-card-month')
+            elif 'year' in text:
+                self.card_year_filled = True
+                return InputPaymentTextField('input-card-year')
+            elif nlp.check_text(text.lower(), ['post code', 'zip', 'postal', 'post-code', 'post_code'], ['card-number']):
+                return InputCheckoutFields('zip')
+            else:
+                return Nothing()
+        elif control.type == controls.Types.select:
+            if nlp.check_text(text.lower(), self.contains, ['credit-card-number'])\
+                    or control.label and nlp.check_text(control.label.lower(), self.contains, ['credit-card-number']):
+                return InputSelectField('card-type')
+            elif nlp.check_text(text.lower(), ['expiration', 'expire', 'year', 'month'], ['credit-card-number']):
+                if nlp.check_text(text.lower(), ['month', 'mm'], ['year']):
+                    self.card_month_filled = True
+                    if '06 - June' in control.values:
+                        return InputSelectField('expire-month-text-with-number-full')
+                    elif '6 - June' in control.values:
+                        return InputSelectField('expire-month-text-with-number-short')
+                    elif 'June' in control.values:
+                        return InputSelectField('expire-month-text-full')
+                    elif 'Jun' in control.values:
+                        return InputSelectField('expire-month-text-short')
+                    elif '06' in control.values:
+                        return InputSelectField('expire-month-number-full')
+                    elif '6' in control.values:
+                        return InputSelectField('expire-month-number-short')
+                    else:
+                        return InputSelectField('expire-month-text-full')
+                elif nlp.check_text(text.lower(), ['year', 'yy'], ['month']):
+                    self.card_year_filled = True
+                    if '2021' in control.values:
+                        return InputSelectField('expire-year-full')
+                    elif '21' in control.values:
+                        return InputSelectField('expire-year-short')
+                    else:
+                        return InputSelectField('expire-year-full')
+                return Nothing()
+            else:
+                return Nothing()
+        elif control.type == controls.Types.radiobutton:
+            sub_contains = ['credit card', 'credit-card', 'free']
+            sub_not_contains = ['number']
+
+            if nlp.check_text(text.lower(), , ['number'])\
+                    or (control.label and nlp.check_text(control.label.lower(), sub_contains, sub_not_contains)):
+                return Click()
+
+            return Nothing()
+        elif control.type in [controls.Types.button, controls.Types.link]:
+            sub_contains = ['place order', 'continue']
+            sub_not_contains = ['sign-in', 'continue shopping']
+
+            if control.label and nlp.check_text(control.label.lower(), sub_contains, sub_not_contains):
+                if self.get_filling_status():
+                    return Click()
+                else:
+                    self.place_order_control = control
+                    return Nothing()
+
+            return Nothing()
+        else:
+            return Nothing()
+
+    def get_state_after_action(self, is_success, state, control, environment):
+        if not is_success:
+            return (state, False)
+        try:
+            text = control.elem.get_attribute('outerHTML')
+
+            if (nlp.check_text(text.lower(), self.contains, ['number']) and self.flag or \
+                (control.label and nlp.check_text(control.label.lower(), self.contains, ['number']) and self.flag):
+                self.flag = False
+                environment.reset_control()
+
+            if control.label and nlp.check_text(control.label.lower(), ['place order'], self.not_contains):
+                return (States.purchased, False)
+            elif control.label and nlp.check_text(control.label.lower(), ['continue'], self.not_contains):
+                return (States.pay, False)
+        except:
+            pass
+        return (state, False)
+
+
+class Pay(IEnvActor):
+    type_list = [controls.Types.link, controls.Types.button]
+    contains = ['continue', 'proceed', 'ahead', 'place', 'pay for order']
+    not_contains = ['login', 'signin', 'log-in', 'sign-in', 'register', 'continue shopping']
+
+    def __str__(self):
+        return "Pay"
+
+    def get_states(self):
+        return [States.pay]
+
+    def get_action(self, control):
+        if control.type not in self.type_list:
+            return Nothing()
+        text = control.elem.get_attribute('outerHTML')
+
+        if nlp.check_text(text.lower(), self.contains, self.not_contains):
+            return Click()
+
+        else:
+            return Nothing()
+
+    def get_state_after_action(self, is_success, state, control, environment):
+        if not is_success:
+            return (state, False)
+
+        try:
+            if control.label and nlp.check_text(control.label.lower(), self.contains, self.not_contains):
+                return (States.purchased, False)
+            text = control.elem.get_attribute('outerHTML')
+
+            if nlp.check_text(text.lower(), self.contains, self.not_contains):
+                return (States.purchased, False)
+        except:
+            pass
+
+        return (state, False)
+
+
 def add_tracer_extensions(tracer):
-    tracer.add_handler(ClosePopups(), 5)
-    
+    # tracer.add_handler(ClosePopups(), 5)
+
     tracer.add_handler(AddToCart(), 4)
     tracer.add_handler(SearchForProductPage(), 1)
     tracer.add_handler(ToProductPageLink(), 3)
     tracer.add_handler(ToShopLink(), 2)
 
     tracer.add_handler(ToCheckout(), 3)
+    tracer.add_handler(CheckoutLogin(), 2)
+    tracer.add_handler(FillingCheckoutPage(), 2)
+    tracer.add_handler(PaymentMultiSteps(), 2)
+    tracer.add_handler(PrePaymentFillingPage(), 2)
+    tracer.add_handler(FillingPaymentPage(), 2)
+    tracer.add_handler(Pay(), 2)
     tracer.add_handler(ToCartLink(), 2)
-    # tracer.add_handler(PaymentFields(), 2)

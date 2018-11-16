@@ -223,7 +223,7 @@ def scroll_to_element(driver, element):
     # location could change during scrolling do it until it fixed
     for i in range(5):
         y = element.location['y']
-        scroll_to(driver, max(0, y - 200))
+        scroll_to(driver, max(0, y - 300))
         scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
         if last_scroll == scroll:
             break

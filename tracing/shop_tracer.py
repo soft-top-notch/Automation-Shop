@@ -11,6 +11,7 @@ from selenium_helper import *
 from status import *
 
 
+
 class States:
     new = "new"
     shop = "shop"
@@ -19,10 +20,18 @@ class States:
     cart_page = "cart_page"
     checkout_page = "checkout_page"
     payment_page = "payment_page"
-    iframe_page = "iframe_page"
     purchased = "purchased"
+    checkoutLoginPage = "checkout_login_page"
+    fillCheckoutPage = "fill_checkout_page"
+    paymentMultipleSteps = "payment_multiple_steps"
+    fillPaymentPage = "fill_payment_page"
+    pay = "pay"
 
-    states = [new, shop, product_in_cart, cart_page, product_page, checkout_page, iframe_page, purchased]
+    states = [
+        new, shop, product_in_cart, cart_page, product_page, 
+        checkout_page, checkoutLoginPage, fillCheckoutPage, 
+        paymentMultipleSteps, fillPaymentPage, pay, purchased
+    ]
 
 
 class TraceContext:
@@ -227,21 +236,25 @@ class ShopTracer:
         else:
             while self.environment.has_next_control():
                 ctrl = self.environment.get_next_control()
+                print(ctrl)
                 action = actor.get_action(ctrl)
-
+                print(action)
                 if action.__class__.__name__ == "Nothing":
                     continue
                 is_success,_ = self.environment.apply_action(ctrl, action)
 
                 if is_success:
-                    current_state = (
-                        get_url(self.environment.driver),
-                        self.environment.c_idx,
-                        self.environment.f_idx
-                    )
+                    try:
+                        current_state = (
+                             get_url(self.environment.driver),
+                            self.environment.c_idx,
+                            self.environment.f_idx
+                        )
+                    except:
+                        current_state = None
                     self.environment.states.append(current_state)
                 new_state, discard = actor.get_state_after_action(is_success, state, ctrl, self.environment)
-                
+
                 # Discard last action
                 if discard:
                     self.environment.discard()
@@ -260,6 +273,8 @@ class ShopTracer:
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
+        print(self._handlers)
+        print(handlers)
 
         for priority, handler in handlers:
             self.environment.reset_control()
@@ -313,6 +328,7 @@ class ShopTracer:
         context = TraceContext(domain, user_info, payment_info, delaying_time, self)
             
         try:
+            print("*** 1 ***")
             status = None
 
             if not self.environment.start(domain):
@@ -325,8 +341,11 @@ class ShopTracer:
                 return NotAvailable('Domain {} for sale'.format(domain))
 
             new_state = state
-
+            print("*** 2 ***")
+            print(state)
+            print(States.purchased)
             while state != States.purchased:
+                print("*** 2.1 ***")
                 new_state = self.process_state(state, context)
 
                 if state == new_state:
@@ -335,11 +354,13 @@ class ShopTracer:
                 state = new_state
                 
         except:
+            print("*** 3 ***")
             self._logger.exception("Unexpected exception during processing {}".format(domain))
             exception = traceback.format_exc()
             status = ProcessingStatus(state, exception)
 
         finally:
+            print("*** 4 ***")
             if not status:
                 status = ProcessingStatus(state)
             
