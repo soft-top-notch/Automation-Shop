@@ -333,13 +333,13 @@ class SearchProductPage(ISiteAction):
     def is_applicable(self, driver):
         return True
 
-    def search_in_google(self, driver, query):
+    def search_in_google(self, driver, query, site):
         driver.get('https://www.google.com')
         time.sleep(3)
 
         search_input = driver.find_element_by_css_selector('input.gsfi')
         search_input.clear()
-        search_input.send_keys(query)
+        search_input.send_keys("site:{} {}".format(site, query))
         search_input.send_keys(Keys.ENTER)
         time.sleep(3)
 
@@ -349,18 +349,22 @@ class SearchProductPage(ISiteAction):
         else:
             return None
 
-    def search_in_bing(self, driver, query):
+    def search_in_bing(self, driver, query, site):
         driver.get('https://www.bing.com')
         time.sleep(3)
 
         search_input = driver.find_element_by_css_selector('input.b_searchbox')
         search_input.clear()
-        search_input.send_keys(query)
+        search_input.send_keys("site:{} {}".format(site, query))
         search_input.send_keys(Keys.ENTER)
         time.sleep(3)
-        
-        links = driver.find_elements_by_css_selector('ol#b_results > li.b_algo > h2 > a[href]')
-        
+
+        links = []
+        items = driver.find_elements_by_css_selector("ol#b_results > li.b_algo")
+        for item in items:
+            if len(item.find_elements_by_css_selector("p strong")) > 0:
+                links.append(item.find_element_by_css_selector("h2 > a[href]"))
+
         if len(links) > 0:
             return [link.get_attribute("href") for link in links]
         else:
@@ -374,12 +378,10 @@ class SearchProductPage(ISiteAction):
         try:
             new_tab(driver)
             for query in queries:
-                google_query = 'site:{} {}'.format(domain, query)
-
                 searches = [self.search_in_bing, self.search_in_google]
                 for search in searches:
                     try:
-                        links = search(driver, google_query)
+                        links = search(driver, query, domain)
                         if links:
                             return links
 

@@ -5,18 +5,18 @@ import sys
 
 sys.path.insert(0, '../tracing')
 
-import common_actors
+import heuristic.common_actors as common_actors
 import user_data
 
 from rl.environment import *
 from heuristic.shop_tracer import *
-from selenium_helper import *
 from trace_logger import *
 from datetime import datetime
 from contextlib import contextmanager
 
+
 @contextmanager
-def get_tracer(headless=False):
+def get_tracer(headless=True):
     env = Environment(user = user_data.get_user_data, headless=headless)
     tracer = ShopTracer(environment = env)
     common_actors.add_tracer_extensions(tracer)
@@ -25,7 +25,7 @@ def get_tracer(headless=False):
 
 logger = logging.getLogger('shop_tracer')
 logger.propagate = False
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -48,7 +48,7 @@ date_format = "%m-%d-%Y %H:%M:%S"
 results = []
 times = []
 
-with get_tracer(headless=False) as tracer:
+with get_tracer(headless=True) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()
@@ -56,9 +56,11 @@ with get_tracer(headless=False) as tracer:
         new_time = datetime.now()
 
         if status.state == States.purchased:
-            logger.warning("\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Exactly purchased! Success!-----"))
+            logger.warning("\n\nfinished url: {}, status: {}, state: {}"
+                           .format(url, status, "-----Exactly purchased! Success!-----"))
         else:
-            warnning_text = "\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Can't purchase! Failed!-----")
+            warnning_text = "\n\nfinished url: {}, status: {}, state: {}"\
+                .format(url, status, "-----Can't purchase! Failed!-----")
             logger.warning(warnning_text)
             results.append(warnning_text)
         logger.warning("\n\n-------Execute time: {} minutes-------".format(int((new_time - old_time).total_seconds() / 60.0)))

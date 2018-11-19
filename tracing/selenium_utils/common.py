@@ -7,7 +7,7 @@ import os
 from PIL import Image
 import time
 
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, UnexpectedAlertPresentException
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.webdriver.support.expected_conditions import staleness_of

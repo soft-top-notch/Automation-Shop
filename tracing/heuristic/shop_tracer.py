@@ -1,15 +1,10 @@
 import logging
 import traceback
 import requests
-import user_data
 import selenium
-
-from rl.environment import *
-from abc import ABCMeta, abstractmethod
-from common_heuristics import *
-from selenium_helper import *
-from status import *
-
+from abc import abstractmethod
+from tracing.common_heuristics import *
+from tracing.status import *
 
 
 class States:
@@ -22,6 +17,7 @@ class States:
     payment_page = "payment_page"
     purchased = "purchased"
     checkoutLoginPage = "checkout_login_page"
+    prePaymentFillingPage = "pre_payment_filling_page"
     fillCheckoutPage = "fill_checkout_page"
     paymentMultipleSteps = "payment_multiple_steps"
     fillPaymentPage = "fill_payment_page"
@@ -29,8 +25,8 @@ class States:
 
     states = [
         new, shop, product_in_cart, cart_page, product_page, 
-        checkout_page, checkoutLoginPage, fillCheckoutPage, 
-        paymentMultipleSteps, fillPaymentPage, pay, purchased
+        checkout_page, checkoutLoginPage, fillCheckoutPage,
+        prePaymentFillingPage, fillPaymentPage, pay, purchased
     ]
 
 
@@ -214,17 +210,6 @@ class ShopTracer:
         except requests.exceptions.ConnectionError:
             return NotAvailable(url)
 
-    def get_driver(self, timeout=60):
-        if self._driver:
-            self._driver.quit()
-
-        driver = create_chrome_driver(self._chrome_path, self._headless)
-        driver.set_page_load_timeout(timeout)
-
-        self._driver = driver
-
-        return driver
-    
     def apply_actor(self, actor, state):
         if actor.__class__.__name__ == "SearchForProductPage":
             action = actor.get_action(self.environment)
@@ -236,11 +221,13 @@ class ShopTracer:
         else:
             while self.environment.has_next_control():
                 ctrl = self.environment.get_next_control()
-                print(ctrl)
                 action = actor.get_action(ctrl)
-                print(action)
                 if action.__class__.__name__ == "Nothing":
                     continue
+
+                self._logger.info(ctrl)
+                self._logger.info(action)
+
                 is_success,_ = self.environment.apply_action(ctrl, action)
 
                 if is_success:
@@ -273,9 +260,6 @@ class ShopTracer:
         handlers.sort(key=lambda p: -p[0])
 
         self._logger.info('processing state: {}'.format(state))
-        print(self._handlers)
-        print(handlers)
-
         for priority, handler in handlers:
             self.environment.reset_control()
             self._logger.info('handler {}'.format(handler))
@@ -287,6 +271,7 @@ class ShopTracer:
             if new_state != state:
                 return new_state
         return state
+
 
     def trace(self, domain, wait_response_seconds = 60, attempts = 3, delaying_time = 10):
         """
@@ -328,24 +313,18 @@ class ShopTracer:
         context = TraceContext(domain, user_info, payment_info, delaying_time, self)
             
         try:
-            print("*** 1 ***")
             status = None
 
             if not self.environment.start(domain):
-                return "Error is occured in starting environment"
-            
+                return NotAvailable('Domain {} is not available'.format(domain))
+
             context.on_started()   
             assert context.is_started
             
             if is_domain_for_sale(self.environment.driver, domain):
                 return NotAvailable('Domain {} for sale'.format(domain))
 
-            new_state = state
-            print("*** 2 ***")
-            print(state)
-            print(States.purchased)
             while state != States.purchased:
-                print("*** 2.1 ***")
                 new_state = self.process_state(state, context)
 
                 if state == new_state:
@@ -354,13 +333,11 @@ class ShopTracer:
                 state = new_state
                 
         except:
-            print("*** 3 ***")
             self._logger.exception("Unexpected exception during processing {}".format(domain))
             exception = traceback.format_exc()
             status = ProcessingStatus(state, exception)
 
         finally:
-            print("*** 4 ***")
             if not status:
                 status = ProcessingStatus(state)
             
