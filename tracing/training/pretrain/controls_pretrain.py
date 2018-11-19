@@ -272,12 +272,12 @@ if __name__ == '__main__':
                        and sum(ctrl['possible_actions']) == 1]
     print(len(to_train_inputs))
 
-
+    saver.restore(session, './checkpoints/pretrain_checkpoint-8')
     # Choose what to train
     # 1. to_train - is full dataset
     # 2. to_train_input - is small dataset for controls that aren't clickable
-    for epoch in range(40):
-        model.train(to_train_inputs, lr=0.001, 
+    for epoch in range(9, 40):
+        model.train(controls, lr=0.001, 
                 l2 = 0.0001,
                 epoch_start = epoch, 
                 epoch_end = epoch + 1, batch_size = 20, dropout = 0.8)

@@ -6,6 +6,7 @@ from tracing.rl.actor_learner import ActorLearnerWorker
 import tensorflow as tf
 import threading
 import random
+from queue import Queue
 
 from create_dataset import read_popups_rl_dataset
 from tracing.training.classification.page_classifier import PageClassifier
@@ -62,7 +63,7 @@ for i in range(num_workers):
                                 train_urls,
                                 global_model, 
                                 env, 
-                                100, 
+                                3000, 
                                 n_step = 10, 
                                 lr=0.001, 
                                 l2 = 0.003,
@@ -84,14 +85,19 @@ def start_learning(worker):
             traceback.print_exc()
         
 checkpoint = None
+steps = 0
+saved = {}
 for i in range(100):
     fname = './checkpoints/checkpoint-{}'.format(i)
     if os.path.exists(fname + '.index'):
         checkpoint = fname
+        step = 100 * i
+        saved[i] = True
 
 if checkpoint:
     print('loading checkpoint', checkpoint)
     global_model.restore(checkpoint)
+    ActorLearnerWorker.global_step = step
 
 threads = []
 for worker in workers:
@@ -101,14 +107,13 @@ for worker in workers:
     threads.append(thread)
 
 
-saved = {}
 while ActorLearnerWorker.global_step + 1 < workers[0].max_steps:
     time.sleep(60)
     
     rewards = ActorLearnerWorker.step_rewards[:]
-    steps = len(rewards)
-    if steps > 0:
-        print('\n\n-----> avg_reward {} after {} steps\n\n'.format(sum(rewards) / steps, steps))
+    steps = ActorLearnerWorker.global_step
+    if len(rewards) > 0:
+        print('\n\n-----> avg_reward {} after {} steps\n\n'.format(sum(rewards) / len(rewards), steps))
 
     portion = steps // 100
     if portion > 0 and saved.get(portion) is None:
