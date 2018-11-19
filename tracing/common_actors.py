@@ -23,6 +23,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import ElementNotVisibleException, TimeoutException, StaleElementReferenceException, NoSuchElementException
+from heuristic.shop_tracer import *
 
 
 class ToProductPageLink(IEnvActor):
@@ -302,7 +303,7 @@ class FillingCheckoutPage(ISiteActor):
         return [States.fillCheckoutPage]
 
     def get_action(self, control):
-        if control.type not in type_list:
+        if control.type not in self.type_list:
             return Nothing()
 
         if control.type == controls.Types.text:
@@ -521,7 +522,7 @@ class FillingPaymentPage(ISiteActor):
             sub_contains = ['credit card', 'credit-card', 'free']
             sub_not_contains = ['number']
 
-            if nlp.check_text(text.lower(), , ['number'])\
+            if nlp.check_text(text.lower(), sub_contains, sub_not_contains)\
                     or (control.label and nlp.check_text(control.label.lower(), sub_contains, sub_not_contains)):
                 return Click()
 
@@ -547,7 +548,7 @@ class FillingPaymentPage(ISiteActor):
         try:
             text = control.elem.get_attribute('outerHTML')
 
-            if (nlp.check_text(text.lower(), self.contains, ['number']) and self.flag or \
+            if (nlp.check_text(text.lower(), self.contains, ['number']) and self.flag) or \
                 (control.label and nlp.check_text(control.label.lower(), self.contains, ['number']) and self.flag):
                 self.flag = False
                 environment.reset_control()
@@ -611,7 +612,6 @@ def add_tracer_extensions(tracer):
     tracer.add_handler(ToCheckout(), 3)
     tracer.add_handler(CheckoutLogin(), 2)
     tracer.add_handler(FillingCheckoutPage(), 2)
-    tracer.add_handler(PaymentMultiSteps(), 2)
     tracer.add_handler(PrePaymentFillingPage(), 2)
     tracer.add_handler(FillingPaymentPage(), 2)
     tracer.add_handler(Pay(), 2)

@@ -23,14 +23,14 @@ class States:
     purchased = "purchased"
     checkoutLoginPage = "checkout_login_page"
     fillCheckoutPage = "fill_checkout_page"
-    paymentMultipleSteps = "payment_multiple_steps"
+    prePaymentFillingPage = "pre_payment_filling_page"
     fillPaymentPage = "fill_payment_page"
     pay = "pay"
 
     states = [
         new, shop, product_in_cart, cart_page, product_page, 
         checkout_page, checkoutLoginPage, fillCheckoutPage, 
-        paymentMultipleSteps, fillPaymentPage, pay, purchased
+        prePaymentFillingPage, fillPaymentPage, pay, purchased
     ]
 
 
