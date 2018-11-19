@@ -19,7 +19,7 @@ class States:
     checkoutLoginPage = "checkout_login_page"
     prePaymentFillingPage = "pre_payment_filling_page"
     fillCheckoutPage = "fill_checkout_page"
-    paymentMultipleSteps = "payment_multiple_steps"
+    prePaymentFillingPage = "pre_payment_filling_page"
     fillPaymentPage = "fill_payment_page"
     pay = "pay"
 
