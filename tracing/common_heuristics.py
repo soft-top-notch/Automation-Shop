@@ -238,3 +238,7 @@ def is_domain_for_sale(driver, domain):
     text = get_page_text(driver)
     return nlp.check_if_domain_for_sale(text, domain)
 
+def search_for_add_to_cart(driver):
+    contains =  ["addtocart", "addtobag", "add to cart", "add to bag"]
+    not_contains = ["where", "about us"]
+    return find_buttons_or_links(driver, contains, not_contains)

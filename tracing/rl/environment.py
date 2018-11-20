@@ -6,9 +6,9 @@ import os
 import numpy as np
 import traceback
 import time
+import functools
 
-sys.path.insert(0, '..')
-
+from tracing.rl.actions import Nothing, Wait, Click
 import tracing.selenium_utils.common as common
 import tracing.selenium_utils.controls as selenium_controls
 
@@ -17,15 +17,14 @@ class Environment:
     
     def __init__(self, 
                  rewards = None, 
-                 user = None, 
                  width = 672, # Width of screenshot
                  headless = True,
                  crop_h = 300,
                  crop_w = 300,
-                 crop_pad = 5
+                 crop_pad = 5,
+                 max_passes = 3
                 ):
         self.rewards = rewards
-        self.user = user()
         self.width = width
         self.headless = headless
         self.step = 0
@@ -34,26 +33,40 @@ class Environment:
         self.crop_w = crop_w
         self.screen_scale = None
         self.crop_pad = crop_pad
+        self.passes = 0
         self.states = []
+        self.max_passes = max_passes
 
     def __enter__(self):
         pass
 
-    def is_final(self):
-        assert self.rewards is not None
+    def __exit__(self, type, value, traceback):
+        self.try_quit_driver()
 
-        return self.rewards.is_final()
+    def try_quit_driver(self):
+        try:
+            if self.driver is not None:
+                self.driver.quit()
+        except:
+            traceback.print_exc()
 
-    def start(self, url):
+        self.driver = None
+
+    def start(self, url, context):
+        self.url = url
+        self.context = context
+
+        self.try_quit_driver()
         self.step = 0
         self.controls = None
         self.c_idx = 0
         self.frames = None
         self.f_idx = 0
+        self.is_changed = False
+        self.passes = 0
+        self.states = []
 
         try:
-            if self.driver:
-                self.try_quit_driver()
             self.driver = common.create_chrome_driver(headless = self.headless, size=(1280, 1024))
             self.driver.set_page_load_timeout(120)
 
@@ -79,27 +92,61 @@ class Environment:
             traceback.print_exc()
             return False
 
-    def __exit__(self, type, value, traceback):
-        self.try_quit_driver()
+    def refresh_controls_if_needs(self):
+        if self.passes >= self.max_passes or (self.rewards and self.is_final()) or not self.is_changed:
+            return False
+           
+        return self.reset_control()
 
-    def try_quit_driver(self):
-        try:
-            if self.driver is not None:
-                self.driver.quit()
-        except:
-            traceback.print_exc()
 
-        self.driver = None
+    def reset_control(self):
+        self.states = []
+        self.try_switch_to_default()
+
+        self.is_changed = False
+        self.passes += 1
+
+        self.controls = None
+        self.c_ids = 0
+        self.frames = None
+        self.f_idx = 0
+
+        return True
+
+    def get_next_frame(self, move = True):
+        if move:
+            self.f_idx += 1
+
+        while True:
+            self.try_switch_to_default()
+            self.frames = self.get_frames()
+            
+            if self.f_idx >= len(self.frames):
+                return False
+            
+            if not self.try_switch_to_frame():
+                self.f_idx += 1
+                continue
+            
+            self.controls = None
+            self.c_idx = 0
+            return True
+
+        return True
 
     def has_next_control(self):
+        self.refresh_controls_if_needs()
+        
         if self.frames is None:
             # First enter after start
-            self.frames = common.get_frames(self.driver)
-            self.f_idx = 0
-            self.controls = None
+            if not self.get_next_frame(move=False):
+                return False
+
+        if self.f_idx >= len(self.frames):
+            return False
 
         # Extract controls from every frame
-        while self.f_idx < len(self.frames):
+        while True:
             if self.controls is None:
                 self.controls = self.get_controls()
                 self.c_idx = 0
@@ -114,26 +161,35 @@ class Environment:
             self.controls = None
             
             # Finding for the next frame
-            self.f_idx += 1
-            while self.f_idx < len(self.frames):
-                self.try_switch_to_default()
-                if self.try_switch_to_frame():
-                    break
-                    
-                self.f_idx += 1
-
+            if not self.get_next_frame():
+                return False
+            
         return False
     
+
     def get_next_control(self, move = True):
         assert self.has_next_control()
         
         ctrl = self.controls[self.c_idx]
-
         if move:
             self.c_idx += 1
         
         return ctrl
-    
+
+    def is_final(self):
+        assert self.rewards is not None
+
+        return self.rewards.is_final()
+
+    def save_state(self):
+        state = (
+            common.get_url(self.driver),
+            self.c_idx,
+            self.f_idx
+        )
+        self.states.append(state)
+
+
     def discard(self):
         assert len(self.states) > 0, "Nothing to discard"
         url, c_idx, f_idx = self.states[-1]
@@ -153,13 +209,7 @@ class Environment:
         self.controls = self.get_controls()
         self.c_idx = c_idx + 1
 
-    def reset_control(self):
-        self.try_switch_to_default()
-        self.frames = None
-        self.controls = None
-        self.c_idx = 0
-        self.f_idx = 0
-
+    # ToDo Need to remove?
     def get_ctrl_by_contains(self, contains, not_contains, type_list):
         ctrl = None
 
@@ -190,12 +240,12 @@ class Environment:
             common.get_screenshot(self.driver, tmp)
 
         # 3. Resize image
-        img = Image.open(tmp)
+        img = PIL.Image.open(tmp)
         width_scale = self.width / float(img.size[0]) / scale
 
         width = int(self.width / scale)
         height = int((img.size[1] * width_scale))
-        img = img.resize((width, height), Image.ANTIALIAS)
+        img = img.resize((width, height), PIL.Image.ANTIALIAS)
         img.save(tmp)
         
         self.scale = width_scale * self.screen_scale
@@ -213,7 +263,8 @@ class Environment:
             image = np.append(image, to_add, axis=0)
         
         return image
-
+    
+    
     def crop_image(self, image, center_x, center_y):
         (h, w, c) = image.shape
 
@@ -248,22 +299,44 @@ class Environment:
                 image = np.concatenate((image, hor2), 1)
             else:
                 image = np.concatenate((hor1, image, hor2), 1)
+            
+        
         return image
 
+
+    def get_frame_location(self):
+        if self.f_idx == 0:
+            return {'x': 0, 'y': 0}
+        else:
+            self.try_switch_to_default()
+            if self.f_idx >= len(self.frames):
+                print('frames: {}, f_idx: {}, url: {}'.format(len(self.frames), self.f_idx, self.url))
+
+            result = self.frames[self.f_idx].location
+            result['y'] -= common.get_scroll_top(self.driver)
+            self.try_switch_to_frame()
+            return result
+    
+    
     def get_screen_scale(self, ctrl):
         s = ctrl.size
-        ws = common.get_viewport_size(self.driver)
+        self.try_switch_to_default()
+        try:
+            ws = common.get_viewport_size(self.driver)
 
-        start_scale = self.width / self.crop_w
+            start_scale = self.width / self.crop_w
 
-        scale = max((s['width'] + 2.*self.crop_pad) / ws['width'] * start_scale, 
+            scale = max((s['width'] + 2.*self.crop_pad) / ws['width'] * start_scale, 
                     (s['height'] + 2.*self.crop_pad) / ws['height'] * start_scale)
 
-        scale = max(0.5, scale)
-        scale = min(start_scale, scale)
+            scale = max(0.5, scale)
+            scale = min(start_scale, scale)
 
-        return scale
-
+            return scale
+        finally:
+            self.try_switch_to_frame()
+    
+    
     def get_control_as_input(self, ctrl):
         x, y = selenium_controls.scroll_to_element(self.driver, ctrl)
         if y < 0:
@@ -275,6 +348,8 @@ class Environment:
                     scroll = common.get_scroll_top(self.driver)
                     y = ctrl.location['y'] - scroll
                     x = ctrl.location['x']
+                
+        
         assert ctrl.location['y'] >= 0
         
         time.sleep(0.2)
@@ -282,9 +357,11 @@ class Environment:
         scale = self.get_screen_scale(ctrl)
         image = self.get_screenshot_as_array(scale=scale)
         
+        frame_offset = self.get_frame_location()
+
         [h, w, _] = image.shape
-        top = y              
-        left = x
+        top = y + frame_offset['y']
+        left = x + frame_offset['x']
         bottom = top + ctrl.size['height']
         right = left + ctrl.size['width']
         
@@ -297,7 +374,7 @@ class Environment:
         left = max(left, 0)
         bottom = min(bottom, h)
         right = min(right, w)
-        
+                
         assert(bottom > top and right > left)
 
         if top > self.crop_pad:
@@ -313,29 +390,66 @@ class Environment:
         
         return (image - 128.0) / 128.0
 
-    # Returns input images for different controls
+    
     def get_controls(self):
-        
+        """
+        :return:   Returns ordered controls for current frame
+        """
+        def cmp(ctrl1, ctrl2):
+            ydelta = ctrl1.location['y'] - ctrl2.location['y']
+            if abs(ydelta) >= 15:
+                return ydelta
+
+            return ctrl1.location['x'] - ctrl2.location['x']
+
         controls = selenium_controls.extract_controls(self.driver)
 
         # Sort by Top then by Left of control location
-        controls.sort(key = lambda ctrl: (ctrl.location['y'], ctrl.location['x']))
-        
+        controls.sort(key = functools.cmp_to_key(cmp))
+
         return controls
 
+    
+    def get_frames(self):
+        win_height = common.get_page_height(self.driver)
+        win_width = self.driver.execute_script('return window.innerHeight')
+        
+        frames = common.get_frames(self.driver)    
+        filtered = []
+        for frame in frames:
+            if not frame:
+                filtered.append(frame)
+                continue
+                
+            if frame.location['x'] < 0 or frame.size['height'] <= 0 or frame.size['width'] <= 0:
+                continue
+            
+            if frame.location['y'] >= win_height - 2:
+                continue
+        
+            if frame.location['x'] >= win_width - 2:
+                continue  
+            
+            filtered.append(frame)
+            
+        return filtered
+
+    
     def try_switch_to_frame(self):
         try:
             if self.frames and self.f_idx < len(self.frames):
                 frame = self.frames[self.f_idx]
                 if frame:
+                    selenium_controls.scroll_to_element(self.driver, frame)
                     self.driver.switch_to.frame(self.frames[self.f_idx])
  
                 return True
         except:
-            pass
+            traceback.print_exc()
         
         return False
 
+    
     def try_switch_to_default(self):
         try:
             self.driver.switch_to.default_content()
@@ -346,30 +460,45 @@ class Environment:
     def apply_action(self, control, action):
         # Switch to main frame 
         success = False
+        self.step += 1
+
+        user = [self.context.user_info, self.context.payment_info]
+        if isinstance(action, Nothing) or isinstance(action, Wait):
+            success = action.apply(control, self.driver, user)
+            return 0
+
         try:
+            prev_url = selenium_controls.normalize_url(common.get_url(self.driver))
+
             if self.rewards:
                 self.try_switch_to_default()       
                 self.rewards.before_action(self.driver, action)
-            self.step += 1
 
             if self.rewards:
                  self.try_switch_to_frame()
-            success = action.apply(control, self.driver, self.user)
+            success = action.apply(control, self.driver, user)
+
+            url = selenium_controls.normalize_url(common.get_url(self.driver))
+            if url != prev_url:
+                self.is_changed = True
+
+            if control:
+                # Control could disappear track it as Environment Changed
+                self.is_changed = self.is_changed or not selenium_controls.is_visible(control.elem)
         except:
             success = False
             traceback.print_exc()
 
         finally:
             if self.rewards:
-                self.try_switch_to_default()       
+                self.try_switch_to_default()
 
                 self.rewards.after_action(self.driver, action)
                 self.try_switch_to_frame()
-
-        return (success, self.rewards)  
-        # return self.rewards.calc_reward(success) if self.rewards else None
-    
+            
+        reward = self.rewards.calc_reward(success) if self.rewards else None
+        return (success, reward)
+                
     def calc_final_reward(self):
         assert self.rewards is not None
-
         return self.rewards.calc_final_reward()

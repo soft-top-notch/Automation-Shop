@@ -17,8 +17,8 @@ from contextlib import contextmanager
 
 @contextmanager
 def get_tracer(headless=True):
-    env = Environment(user = user_data.get_user_data, headless=headless)
-    tracer = ShopTracer(environment = env)
+    env = Environment(headless=headless, max_passes=10)
+    tracer = ShopTracer(environment = env, get_user_data = user_data.get_user_data)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
@@ -52,7 +52,7 @@ with get_tracer(headless=True) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()
-        status = tracer.trace(url, 60, attempts=3, delaying_time=2)
+        status = tracer.trace(url, 60, attempts=1, delaying_time=2)
         new_time = datetime.now()
 
         if status.state == States.purchased:

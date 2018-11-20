@@ -3,6 +3,8 @@ import random
 from selenium.webdriver.common.keys import Keys
 from tracing.selenium_utils.controls import *
 from tracing.selenium_utils import common
+from tracing.common_heuristics import *
+
 from abc import abstractmethod
 
 class IAction:
@@ -343,9 +345,12 @@ class SearchProductPage(ISiteAction):
         search_input.send_keys(Keys.ENTER)
         time.sleep(3)
 
-        links = driver.find_elements_by_css_selector('div.g .rc .r a[href]')
+        links = driver.find_elements_by_css_selector('div.g .rc .r > a[href]')
+        links = [link.get_attribute("href") for link in links]
+        links = list([link for link in links if not link.startswith('https://translate.google.')])
+
         if len(links) > 0:
-            return [link.get_attribute("href") for link in links]
+            return links
         else:
             return None
 
@@ -370,6 +375,17 @@ class SearchProductPage(ISiteAction):
         else:
             return None
 
+
+    def filter(self, driver, links):
+        for link in links:
+            driver.get(link)
+            time.sleep(3)
+            if len(search_for_add_to_cart(driver)) > 0:
+                return link
+
+        return None
+
+
     def search_for_product_link(self, driver):
         queries = ['"add to cart"']
         url_domain = driver.current_url.split("/")
@@ -382,8 +398,10 @@ class SearchProductPage(ISiteAction):
                 for search in searches:
                     try:
                         links = search(driver, query, domain)
-                        if links:
-                            return links
+                        link = self.filter(driver, links)
+
+                        if link:
+                            return link
 
                     except:
                         logger = logging.getLogger('shop_tracer')
@@ -393,17 +411,16 @@ class SearchProductPage(ISiteAction):
             # Close new tab
             close_tab(driver)
 
-        return links
+        return None
 
     def apply(self, ctrl, driver, user):
-        links = self.search_for_product_link(driver)
+        link = self.search_for_product_link(driver)
 
-        if links:
-            links = list(links)
-
-            driver.get(links[0])
+        if link:
+            driver.get(link)
             time.sleep(3)
             return True
+
         return False
 
 

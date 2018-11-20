@@ -24,7 +24,7 @@ class States:
     pay = "pay"
 
     states = [
-        new, shop, product_in_cart, cart_page, product_page, 
+        new, shop, product_page, product_in_cart, cart_page,
         checkout_page, checkoutLoginPage, fillCheckoutPage,
         prePaymentFillingPage, fillPaymentPage, pay, purchased
     ]
@@ -157,9 +157,10 @@ class ISiteActor:
 class ShopTracer:
     def __init__(self,
                  environment,
+                 get_user_data,
                  chrome_path='/usr/bin/chromedriver',
                  # Must be an instance of ITraceSaver
-                 trace_logger = None,
+                 trace_logger = None
                  ):
         """
         :param get_user_data: Function that should return tuple (user_data.UserInfo, user_data.PaymentInfo)
@@ -169,11 +170,11 @@ class ShopTracer:
         :param trace_logger:  ITraceLogger instance that could store snapshots and source code during tracing
         """
         self._handlers = []
-        self._get_user_data = environment.user
         self._chrome_path = chrome_path
         self._logger = logging.getLogger('shop_tracer')
         self._headless = environment.headless
         self._trace_logger = trace_logger
+        self._get_user_data = get_user_data
         self.environment = environment
 
     def __enter__(self):
@@ -213,11 +214,16 @@ class ShopTracer:
     def apply_actor(self, actor, state):
         if actor.__class__.__name__ == "SearchForProductPage":
             action = actor.get_action(self.environment)
+            self.environment.save_state()
+
             is_success,_ = self.environment.apply_action(None, action)
             new_state = actor.get_state_after_action(is_success, state, self.environment)
 
             if new_state != state:
                 return new_state
+            else:
+                self.environment.discard()
+
         else:
             while self.environment.has_next_control():
                 ctrl = self.environment.get_next_control()
@@ -228,18 +234,9 @@ class ShopTracer:
                 self._logger.info(ctrl)
                 self._logger.info(action)
 
-                is_success,_ = self.environment.apply_action(ctrl, action)
+                self.environment.save_state()
 
-                if is_success:
-                    try:
-                        current_state = (
-                             get_url(self.environment.driver),
-                            self.environment.c_idx,
-                            self.environment.f_idx
-                        )
-                    except:
-                        current_state = None
-                    self.environment.states.append(current_state)
+                is_success,_ = self.environment.apply_action(ctrl, action)
                 new_state, discard = actor.get_state_after_action(is_success, state, ctrl, self.environment)
 
                 # Discard last action
@@ -308,14 +305,14 @@ class ShopTracer:
 
     def do_trace(self, domain, wait_response_seconds = 60, delaying_time = 10):
         state = States.new
-        user_info, payment_info = self._get_user_data
+        user_info, payment_info = self._get_user_data()
 
         context = TraceContext(domain, user_info, payment_info, delaying_time, self)
             
         try:
             status = None
 
-            if not self.environment.start(domain):
+            if not self.environment.start(domain, context):
                 return NotAvailable('Domain {} is not available'.format(domain))
 
             context.on_started()   

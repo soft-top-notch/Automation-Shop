@@ -52,14 +52,16 @@ class AddToCart(IEnvActor):
 
     @staticmethod
     def find_to_cart_elements(driver):
-        return find_buttons_or_links(driver, AddToCart.contains, AddToCart.not_contains)
+        return search_for_add_to_cart(driver)
 
     def get_action(self, control):
 
         if control.type not in [controls.Types.link, controls.Types.button]:
             return Nothing()
         try:
-            text = control.elem.get_attribute('outerHTML')
+            text = control.label
+            if not text or not text.strip():
+                text = control.elem.get_attribute('outerHTML')
 
             if nlp.check_text(text, self.contains, self.not_contains):
                 return Click()
@@ -190,8 +192,10 @@ class ToCheckout(IEnvActor):
     def get_action(self, control):
         if control.type not in [controls.Types.link, controls.Types.button]:
             return Nothing()
-        
-        text = control.elem.get_attribute('outerHTML')
+
+        text = control.label
+        if not text or not text.strip():
+            text = control.elem.get_attribute('outerHTML')
 
         if nlp.check_text(text, self.contains, self.not_contains):
             return Click()
