@@ -56,6 +56,19 @@ def check_if_empty_cart(text):
     return check_text(text, contains, [])
 
 
+def check_alert_text(driver, contains, not_contains=None):
+    '''
+        Check alert text and close alert in checkout page.
+    '''
+    try:
+        alert = driver.switch_to.alert
+
+        if check_text(alert.text, contains, not_contains):
+            alert.accept()
+            return True
+    except:
+            return False
+
 def check_if_domain_for_sale(text, domain):
     if re.search('domain .*{}.* for sale'.format(domain), text):
         return True

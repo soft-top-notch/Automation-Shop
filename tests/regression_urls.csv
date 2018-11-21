@@ -1,6 +1,3 @@
-gccdistribution.com,purchased
-sunflowershoppe.com,purchased
-gaffos.com,purchased,Test that we enter user info in PayPal page after entering it into checkout page
 tattooexpresssupply.com,not purchased,Test that we select payment method by clicking "paypal" radio button in several radio buttons
 blinkoptic.com,not purchased,Test that we proceed filling by removing selected "ship to different address" radio button
 snapliquids.com,purchased,Test that we proceed filling by removing selected "ship to different address" radio button
@@ -25,3 +22,6 @@ your247chemist.com,not purchased
 luggagepoint.com,not purchased
 liquidscentsations.com,not purchased
 castlegoldx.com,not purchased
+gccdistribution.com,purchased
+sunflowershoppe.com,purchased
+gaffos.com,purchased,Test that we enter user info in PayPal page after entering it into checkout page

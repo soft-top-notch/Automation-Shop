@@ -221,6 +221,7 @@ class PaymentFields(IStepActor):
                                                          "account.*.(no|without|free)"],
                                                         ["login","signin","sign in"],
                                                         password_fields[0]):
+
                         logger.debug("We can't use this url! Login password required!")
                         return False
         return True
@@ -943,6 +944,7 @@ class PaymentFields(IStepActor):
                             return_flag = False
                         else:
                             return_flag = True
+
                         time.sleep(context.delaying_time - 1)
                 else:
                     return_flag = False
