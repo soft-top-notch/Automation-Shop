@@ -291,7 +291,10 @@ class InputSelectField(IAction):
         elif self.field == "select-country-short-form":
             value = 'USA'
         elif self.field == "select-state-name":
-            value = common.get_name_of_state(user[0].state)
+            if len(ctrl.values[3]) == 2:
+                value = user[0].state
+            else:
+                value = common.get_name_of_state(user[0].state)
         elif self.field == "card-type":
             value = user[1].card_type
         elif self.field == "expire-month-text-with-number-full":

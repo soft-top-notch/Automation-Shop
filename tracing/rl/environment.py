@@ -106,6 +106,19 @@ class Environment:
            
         return self.reset_control()
 
+    def get_next_control_based_frame(self, url, f_idx, c_idx):
+        self.frames = common.get_frames(self.driver)
+        self.f_idx = f_idx
+        self.try_switch_to_frame()
+
+        self.controls = self.get_controls()
+        self.c_idx = c_idx + 1
+
+
+    def refetch_controls(self):
+        url, c_idx, f_idx = self.states[-1]
+        
+        self.get_next_control_based_frame(url, c_idx, f_idx)
 
     def reset_control(self):
         self.states = []
@@ -209,13 +222,7 @@ class Environment:
 
         self.driver.get(url)
         time.sleep(2)
-
-        self.frames = common.get_frames(self.driver)
-        self.f_idx = f_idx
-        self.try_switch_to_frame()
-
-        self.controls = self.get_controls()
-        self.c_idx = c_idx + 1
+        self.get_next_control_based_frame(url, c_idx, f_idx)
 
     # ToDo Need to remove?
     def get_ctrl_by_contains(self, contains, not_contains, type_list):

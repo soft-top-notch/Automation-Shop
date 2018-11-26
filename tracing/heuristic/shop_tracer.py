@@ -96,6 +96,10 @@ class TraceContext:
 class IEnvActor:
 
     @abstractmethod
+    def __init__(self):
+        pass
+
+    @abstractmethod
     def get_states(self):
         """
         States for actor
@@ -131,6 +135,10 @@ class IEnvActor:
 
 
 class ISiteActor:
+
+    @abstractmethod
+    def __init__(self):
+        pass
 
     @abstractmethod
     def get_states(self):
