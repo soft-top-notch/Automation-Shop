@@ -217,12 +217,10 @@ class ToCheckout(IEnvActor):
         if control.type not in self.type_list:
             return Nothing()
 
-        text = control.label
-        full_text = control.elem.get_attribute('outerHTML')
-        if not text or not text.strip():
-            text = control.elem.get_attribute('outerHTML')
+        text = control.elem.get_attribute('outerHTML')
 
-        if nlp.check_text(text.lower(), self.contains, self.not_contains) and nlp.check_text(full_text.lower(), self.contains, self.not_contains):
+        if (control.label and nlp.check_text(control.label, self.contains, self.not_contains)) or \
+            nlp.check_text(text.lower(), self.contains, self.not_contains):
             return Click()
         else:
             return Nothing()
@@ -497,7 +495,7 @@ class PrePaymentFillingPage(IEnvActor):
         return (state, False)
 
 
-class FillingPaymentPage(ISiteActor):
+class FillingPaymentPage(IEnvActor):
     type_list = [
         controls.Types.link, controls.Types.button,
         controls.Types.text, controls.Types.select, 
