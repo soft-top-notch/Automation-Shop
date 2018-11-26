@@ -402,7 +402,7 @@ class SearchProductPage(ISiteAction):
         if len(links) > 0:
             return links
         else:
-            return None
+            return []
 
     def search_in_bing(self, driver, query, site):
         driver.get('https://www.bing.com')
@@ -423,7 +423,7 @@ class SearchProductPage(ISiteAction):
         if len(links) > 0:
             return [link.get_attribute("href") for link in links]
         else:
-            return None
+            return []
 
 
     def filter(self, driver, links):
@@ -433,7 +433,7 @@ class SearchProductPage(ISiteAction):
             if len(search_for_add_to_cart(driver)) > 0:
                 return link
 
-        return None
+        return []
 
 
     def search_for_product_link(self, driver):

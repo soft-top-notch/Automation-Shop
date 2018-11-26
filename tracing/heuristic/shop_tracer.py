@@ -1,10 +1,25 @@
-import logging
-import traceback
 import requests
 import selenium
 from abc import abstractmethod
 from tracing.common_heuristics import *
 from tracing.status import *
+from tracing.rl.environment import Environment
+from tracing.rl.actions import Nothing
+
+
+class ITraceListener:
+
+    def on_tracing_started(self, url):
+        pass
+
+    def before_action(self, environment, control = None, state = None):
+        pass
+
+    def after_action(self, action, is_success, new_state = None):
+        pass
+
+    def on_tracing_finished(self, status):
+        pass
 
 
 class States:
@@ -31,9 +46,7 @@ class States:
 
 
 class TraceContext:
-    def __init__(self, domain, user_info, payment_info, delaying_time, tracer):
-        self.user_info = user_info
-        self.payment_info = payment_info
+    def __init__(self, domain, delaying_time, tracer):
         self.domain = domain
         self.tracer = tracer
         self.trace_logger = tracer._trace_logger
@@ -157,31 +170,53 @@ class ISiteActor:
 class ShopTracer:
     def __init__(self,
                  environment,
-                 get_user_data,
                  chrome_path='/usr/bin/chromedriver',
                  # Must be an instance of ITraceSaver
                  trace_logger = None
                  ):
         """
-        :param get_user_data: Function that should return tuple (user_data.UserInfo, user_data.PaymentInfo)
-            to fill checkout page
+        :param environment    Environment that wraps selenium
+
         :param chrome_path:   Path to chrome driver
         :param headless:      Wheather to start driver in headless mode
         :param trace_logger:  ITraceLogger instance that could store snapshots and source code during tracing
         """
+        if environment is None:
+            environment = Environment()
+
+        self.environment = environment
         self._handlers = []
         self._chrome_path = chrome_path
         self._logger = logging.getLogger('shop_tracer')
         self._headless = environment.headless
         self._trace_logger = trace_logger
-        self._get_user_data = get_user_data
-        self.environment = environment
+
+        self.action_listeners = []
 
     def __enter__(self):
         pass
     
     def __exit__(self, type, value, traceback):
         self.environment.__exit__(type, value, traceback)
+
+    def add_listener(self, listener):
+        self.action_listeners.append(listener)
+
+    def on_tracing_started(self, url):
+        for listener in self.action_listeners:
+            listener.on_tracing_started(url)
+
+    def on_before_action(self, control = None, state = None):
+        for listener in self.action_listeners:
+            listener.before_action(self.environment, control, state)
+
+    def on_after_action(self, action, is_success, new_state = None):
+        for listener in self.action_listeners:
+            listener.after_action(action, is_success, new_state)
+
+    def on_tracing_finished(self, status):
+        for listener in self.action_listeners:
+            listener.on_tracing_finished(status)
 
     def add_handler(self, actor, priority=1):
         assert priority >= 1 and priority <= 10, \
@@ -212,7 +247,9 @@ class ShopTracer:
             return NotAvailable(url)
 
     def apply_actor(self, actor, state):
-        if actor.__class__.__name__ == "SearchForProductPage":
+        if isinstance(actor, ISiteActor):
+            self.on_before_action(state=state)
+
             action = actor.get_action(self.environment)
             self.environment.save_state()
 
@@ -220,24 +257,28 @@ class ShopTracer:
             new_state = actor.get_state_after_action(is_success, state, self.environment)
 
             if new_state != state:
+                self.on_after_action(action, True, new_state = new_state)
                 return new_state
             else:
+                self.on_after_action(action, False, new_state = new_state)
                 self.environment.discard()
-
         else:
+            assert isinstance(actor, IEnvActor), "Actor {} must be IEnvActor".format(actor)
+
             while self.environment.has_next_control():
                 ctrl = self.environment.get_next_control()
+                self.on_before_action(ctrl, state = state)
                 action = actor.get_action(ctrl)
-                if action.__class__.__name__ == "Nothing":
-                    continue
 
-                self._logger.info(ctrl)
-                self._logger.info(action)
-
-                self.environment.save_state()
+                if not isinstance(action, Nothing):
+                    self._logger.info(ctrl)
+                    self._logger.info(action)
+                    self.environment.save_state()
 
                 is_success,_ = self.environment.apply_action(ctrl, action)
+                is_success = is_success and not isinstance(action, Nothing)
                 new_state, discard = actor.get_state_after_action(is_success, state, ctrl, self.environment)
+                self.on_after_action(action, is_success and not discard, new_state=new_state)
 
                 # Discard last action
                 if discard:
@@ -285,7 +326,9 @@ class ShopTracer:
         time_to_sleep = 2
 
         for _ in range(attempts):
+            self.on_tracing_started(domain)
             attempt_result = self.do_trace(domain, wait_response_seconds, delaying_time)
+            self.on_tracing_finished(attempt_result)
 
             if isinstance(attempt_result, ProcessingStatus):
                 idx = States.states.index(attempt_result.state)
@@ -305,14 +348,13 @@ class ShopTracer:
 
     def do_trace(self, domain, wait_response_seconds = 60, delaying_time = 10):
         state = States.new
-        user_info, payment_info = self._get_user_data()
 
-        context = TraceContext(domain, user_info, payment_info, delaying_time, self)
-            
+        context = TraceContext(domain, delaying_time, self)
+
         try:
             status = None
 
-            if not self.environment.start(domain, context):
+            if not self.environment.start(domain):
                 return NotAvailable('Domain {} is not available'.format(domain))
 
             context.on_started()   

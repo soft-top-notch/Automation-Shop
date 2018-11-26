@@ -279,7 +279,7 @@ class CheckoutLogin(IEnvActor):
         return (state, False)
 
 
-class FillingCheckoutPage(ISiteActor):
+class FillingCheckoutPage(IEnvActor):
     type_list = [
         controls.Types.text, controls.Types.select, controls.Types.button, 
         controls.Types.link, controls.Types.radiobutton

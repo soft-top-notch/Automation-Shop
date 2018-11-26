@@ -3,14 +3,18 @@ import csv
 import logging
 import sys
 
-sys.path.insert(0, '../tracing')
+from tracing.rl.environment import Environment
+from tracing.heuristic.shop_tracer import ShopTracer
 
-import heuristic.common_actors as common_actors
-import user_data
+import random
+import csv
+import logging
+import sys
 
-from rl.environment import *
-from heuristic.shop_tracer import *
-from trace_logger import *
+import tracing.heuristic.common_actors as common_actors
+from tracing.rl.environment import *
+from tracing.heuristic.shop_tracer import *
+from tracing.trace_logger import *
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -18,10 +22,11 @@ from contextlib import contextmanager
 @contextmanager
 def get_tracer(headless=True):
     env = Environment(headless=headless, max_passes=10)
-    tracer = ShopTracer(environment = env, get_user_data = user_data.get_user_data)
+    tracer = ShopTracer(environment = env)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
+
 
 logger = logging.getLogger('shop_tracer')
 logger.propagate = False

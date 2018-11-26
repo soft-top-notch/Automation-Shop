@@ -11,7 +11,7 @@ import functools
 from tracing.rl.actions import Nothing, Wait, Click
 import tracing.selenium_utils.common as common
 import tracing.selenium_utils.controls as selenium_controls
-
+from tracing.user_data import get_user_data
 
 class Environment:
     
@@ -52,9 +52,17 @@ class Environment:
 
         self.driver = None
 
-    def start(self, url, context):
+    def start(self, url, user_info = None, payment_info = None):
         self.url = url
-        self.context = context
+
+        if user_info is None or payment_info is None:
+            ui, pi = get_user_data()
+            user_info = user_info or ui
+            payment_info = payment_info or pi
+
+        self.user_info = user_info
+        self.payment_info = payment_info
+
 
         self.try_quit_driver()
         self.step = 0
@@ -240,12 +248,12 @@ class Environment:
             common.get_screenshot(self.driver, tmp)
 
         # 3. Resize image
-        img = PIL.Image.open(tmp)
+        img = Image.open(tmp)
         width_scale = self.width / float(img.size[0]) / scale
 
         width = int(self.width / scale)
         height = int((img.size[1] * width_scale))
-        img = img.resize((width, height), PIL.Image.ANTIALIAS)
+        img = img.resize((width, height), Image.ANTIALIAS)
         img.save(tmp)
         
         self.scale = width_scale * self.screen_scale
@@ -462,10 +470,10 @@ class Environment:
         success = False
         self.step += 1
 
-        user = [self.context.user_info, self.context.payment_info]
+        user = [self.user_info, self.payment_info]
         if isinstance(action, Nothing) or isinstance(action, Wait):
             success = action.apply(control, self.driver, user)
-            return 0
+            return (success, 0)
 
         try:
             prev_url = selenium_controls.normalize_url(common.get_url(self.driver))
