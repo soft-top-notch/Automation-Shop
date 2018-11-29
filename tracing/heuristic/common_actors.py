@@ -19,15 +19,29 @@ class ToProductPageLink(IEnvActor):
     contains = ['/product', '/commodity', '/drug', 'details', 'view']
     not_contains = ['review', 'viewbox', 'view my shopping cart']
 
+    def __init__(self):
+        self.attempts = 3
+        self.checked = {}
+
+    def reset(self):
+        self.attempts = 3
+
     def get_states(self):
-        return [States.new, States.shop]
+        return [States.new, States.shop, States.found_product_in_cart]
 
     def get_action(self, control):
-        if control.type != controls.Types.link:
+        if self.attempts <= 0 or control.type != controls.Types.link:
             return Nothing()
-        
+
+        link = control.elem.get_attribute('href')
+        if link in self.checked:
+            return Nothing()
+
+        self.checked[link] = True
+
         text = control.elem.get_attribute('outerHTML')
         if nlp.check_text(text, self.contains, self.not_contains):
+            self.attempts -= 1
             return Click()
         else:
             return Nothing()
@@ -51,8 +65,15 @@ class AddToCart(IEnvActor):
     contains =  ["addtocart", "addtobag", "add to cart", "add to bag"]
     not_contains = ["where", "about us"]
 
+    def __init__(self):
+        self.attempts = 3
+
+    def reset(self):
+        self.attempts = 3
+
     def get_states(self):
-        return [States.new, States.shop, States.product_page]
+        return [States.new, States.shop, States.product_page,
+                States.found_product_page]
 
     @staticmethod
     def find_to_cart_elements(driver):
@@ -60,14 +81,16 @@ class AddToCart(IEnvActor):
 
     def get_action(self, control):
 
-        if control.type not in self.type_list:
+        if self.attempts <= 0 or control.type not in self.type_list:
             return Nothing()
+
         try:
             text = control.label
             if not text or not text.strip():
                 text = control.elem.get_attribute('outerHTML')
 
             if nlp.check_text(text, self.contains, self.not_contains):
+                self.attempts -= 1
                 return Click()
             else:
                 return Nothing()
@@ -77,9 +100,11 @@ class AddToCart(IEnvActor):
     def get_state_after_action(self, is_success, state, control, environment):
         if not is_success:
             return (state, False)
-        
+
+        new_state = States.found_product_in_cart if state == States.found_product_page else States.product_in_cart
         if not is_empty_cart(environment.driver):
-            return (States.product_in_cart, False)
+            return (new_state, False)
+
         return (state, True)
 
 
@@ -92,7 +117,7 @@ class ToShopLink(IEnvActor):
     not_contains = ["shops", "stores", "shopping", "condition", "policy"]
 
     def get_states(self):
-        return [States.new]
+        return [States.new, States.found_product_in_cart]
 
     def get_action(self, control):
         if control.type not in self.type_list:
@@ -151,16 +176,29 @@ class ToCartLink(IEnvActor):
     contains = ["cart"]
     not_contains = ["add", "append", "remove", "showcart"]
 
+    def __init__(self):
+        self.attempts = 3
+        self.checked = {}
+
+    def reset(self):
+        self.attempts = 3
+
     def get_states(self):
-        return [States.product_in_cart]
+        return [States.product_in_cart, States.found_product_in_cart]
     
     def get_action(self, control):
-
-        if control.type not in self.type_list:
+        if self.attempts <= 0 or control.type not in self.type_list:
             return Nothing()
+
+        link = control.elem.get_attribute('href')
+        if link in self.checked:
+            return Nothing()
+
+        self.checked[link] = True
         
         text = control.elem.get_attribute('outerHTML')
         if nlp.check_text(text, self.contains, self.not_contains):
+            self.attempts -= 1
             return Click()
         else:
             return Nothing()
@@ -172,9 +210,14 @@ class ToCartLink(IEnvActor):
         
         time.sleep(3)
 
-        if not is_empty_cart(environment.driver) and ToCheckout.find_checkout_elements(environment.driver):
+        is_empty = is_empty_cart(environment.driver)
+
+        if is_empty:
+            return (state, True)
+
+        if not is_empty and ToCheckout.find_checkout_elements(environment.driver):
             return (States.cart_page, False)
-        
+
         # Discard last action
         return (state, True)
 
@@ -191,17 +234,16 @@ class ToCheckout(IEnvActor):
         'sign in', 'view cart', 'logo', '/cart'
     ]
 
-    def __init__(self):
-        self.discard_count = 0  
 
     @staticmethod
     def find_checkout_elements(driver):
         btns = find_buttons_or_links(driver, ToCheckout.contains, ToCheckout.not_contains)
 
-        # if there are buttongs that contains words in text return them first
+        # if there are buttons that contains words in text return them first
         exact = []
         for btn in btns:
-            text = btn.get_attribute('innerHTML')
+            label = controls.get_label(btn)
+            text = label or btn.get_attribute('outerHTML')
             if nlp.check_text(text.lower(), ToCheckout.contains, ToCheckout.not_contains):
                 exact.append(btn)
 
@@ -211,19 +253,35 @@ class ToCheckout(IEnvActor):
         return btns
 
     def get_states(self):
-        return [States.product_in_cart, States.cart_page]
+        return [States.product_in_cart,
+                States.found_product_in_cart,
+                States.cart_page,
+                States.cart_page_2,
+                States.cart_page_3
+                ]
 
     def get_action(self, control):
         if control.type not in self.type_list:
             return Nothing()
 
-        text = control.elem.get_attribute('outerHTML')
+        text = control.label or control.elem.get_attribute('outerHTML')
 
-        if (control.label and nlp.check_text(control.label, self.contains, self.not_contains)) or \
-            nlp.check_text(text.lower(), self.contains, self.not_contains):
+        if nlp.check_text(text, self.contains, self.not_contains):
             return Click()
         else:
             return Nothing()
+
+    def get_next_cart_state(self, state):
+        if not state.startswith(States.cart_page):
+            return States.cart_page
+
+        if state == States.cart_page:
+            return States.cart_page_2
+        elif state == States.cart_page_2:
+            return States.cart_page_3
+        else:
+            return States.checkoutLoginPage
+
 
     def get_state_after_action(self, is_success, state, control, environment):
         if not is_success:
@@ -233,16 +291,15 @@ class ToCheckout(IEnvActor):
         close_alert_if_appeared(environment.driver)
 
         if ToCheckout.find_checkout_elements(environment.driver):
-            if self.discard_count == 0:
-                self.discard_count += 1
-                return (state, True)
-        # return (States.fillCheckoutPage, False)
+            new_state = self.get_next_cart_state(state)
+            return (new_state, False)
+
         return (States.checkoutLoginPage, False)
 
 
 class SearchForProductPage(ISiteActor):
     def get_states(self):
-        return [States.new, States.shop]
+        return [States.new]
 
     def get_action(self, environment):
         return SearchProductPage()
@@ -252,7 +309,7 @@ class SearchForProductPage(ISiteActor):
             return state
         
         if AddToCart.find_to_cart_elements(environment.driver):
-            return States.product_page
+            return States.found_product_page
         return state
 
 
@@ -745,15 +802,16 @@ class Pay(IEnvActor):
 def add_tracer_extensions(tracer):
     # tracer.add_handler(ClosePopups(), 5)
 
-    tracer.add_handler(AddToCart(), 4)
-    tracer.add_handler(SearchForProductPage(), 1)
-    tracer.add_handler(ToProductPageLink(), 3)
-    tracer.add_handler(ToShopLink(), 2)
+    tracer.add_handler(SearchForProductPage(), 4)
+    tracer.add_handler(AddToCart(), 3)
+    tracer.add_handler(ToProductPageLink(), 2)
+    tracer.add_handler(ToShopLink(), 1)
 
-    tracer.add_handler(ToCheckout(), 3)
+    tracer.add_handler(ToCheckout(), 6)
+    tracer.add_handler(ToCartLink(), 5)
+
     tracer.add_handler(CheckoutLogin(), 2)
     tracer.add_handler(FillingCheckoutPage(), 2)
     tracer.add_handler(PrePaymentFillingPage(), 2)
     tracer.add_handler(FillingPaymentPage(), 2)
     tracer.add_handler(Pay(), 2)
-    tracer.add_handler(ToCartLink(), 2)

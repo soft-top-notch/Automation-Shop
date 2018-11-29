@@ -131,13 +131,9 @@ def to_string(element):
 
     
 def get_page_text(driver):
-    html = driver.page_source
-    soup = BeautifulSoup(html, 'lxml')
-    
-    for script in soup(["script", "style", "img", "input"]):
-        script.decompose()
-    
-    return soup.get_text()
+
+    body = driver.find_element_by_tag_name('body')
+    return body.get_attribute('innerText')
 
             
 def count_tabs(driver):

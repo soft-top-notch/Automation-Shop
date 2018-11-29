@@ -82,8 +82,8 @@ def remove_letters(text, contains):
 
 
 def check_if_empty_cart(text):
-    contains = ['(cart|bag) is empty',
-            'Cart (empty)',
+    contains = ['(cart|bag) (\w+ |)is empty',
+                '(cart|bag) is (\w+ |)empty',
             'zero (products|items|tickets) in (cart|bag)',
             'zero (products|items|tickets) in .\w* (cart|bag)',
             'no (products|items|tickets) in (cart|bag)',

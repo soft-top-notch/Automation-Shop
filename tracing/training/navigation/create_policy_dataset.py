@@ -13,7 +13,7 @@ import traceback
 import os, os.path
 import json
 
-threads = 8
+threads = 4
 
 @contextmanager
 def get_tracer(headless=True):

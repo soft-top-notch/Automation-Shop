@@ -20,7 +20,7 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def get_tracer(headless=True):
+def get_tracer(headless=False):
     env = Environment(headless=headless, max_passes=10)
     tracer = ShopTracer(environment = env)
     common_actors.add_tracer_extensions(tracer)
@@ -53,7 +53,7 @@ date_format = "%m-%d-%Y %H:%M:%S"
 results = []
 times = []
 
-with get_tracer(headless=True) as tracer:
+with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()

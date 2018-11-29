@@ -6,6 +6,7 @@ import json
 from tracing.heuristic.shop_tracer import ITraceListener
 import tracing.selenium_utils.common as common
 from tracing.utils.images import *
+from tracing.rl.actions import Actions
 import traceback
 
 
@@ -51,20 +52,26 @@ class ActionsFileRecorder(ITraceListener):
         return os.path.join(self.imgs_folder, fname)
 
     def before_action(self, environment, control = None, state = None):
+        self.control_file = None
+        self.control_label = None
+        self.possible_actions = None
+
         # 1. Save control image
         if control is not None:
             try:
                 inp = environment.get_control_as_input(control)
                 self.control_file = self.get_new_img_file()
+
+                pa = []
+                for action in Actions.navigation:
+                    bit = 1 if action.is_applicable(control) else 0
+                    pa.append(bit)
+
+                self.possible_actions = pa
                 self.ih.input2img(inp, self.control_file)
                 self.control_label = control.label
             except:
                 traceback.print_exc()
-                self.control_file = None
-                self.control_label = None
-        else:
-            self.control_file = None
-            self.control_label = None
 
         # 2. Save state image
         self.state_file = self.get_new_img_file()
@@ -83,6 +90,7 @@ class ActionsFileRecorder(ITraceListener):
             'state_img': os.path.basename(self.state_file),
             'action': action.__class__.__name__,
             'is_success': is_success,
+            'possible_actions': self.possible_actions,
             'state': self.state,
             'new_state': new_state,
             'control_label': self.control_label

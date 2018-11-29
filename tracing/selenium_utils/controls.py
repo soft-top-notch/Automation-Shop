@@ -249,9 +249,7 @@ def select_combobox_value(driver, element, value_text):
     """
     Selects combobox value
     :param driver:     Web driver
-    :param left:       Left coordinate of the combobox
-    :param top:        Right coordinate of the combobox
-    :param height:     Height of the combobox
+    :param element:    Html element of the combobox
     :param value_text: Text of value to select
     :return:           Weather select is success or not
     """
@@ -274,12 +272,15 @@ def click(driver, elem):
     add_scripts_if_need(driver)
     
     x, y = scroll_to_element(driver, elem)
-    height = elem.size['height']
-    width = elem.size['width']
+    elem.click()
 
-    assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+    # height = elem.size['height']
+    # width = elem.size['width']
 
-    driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
+    # assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+
+
+    # driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
 
 
 def enter_text(elem, text):

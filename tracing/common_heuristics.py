@@ -1,11 +1,11 @@
 import random
-import nlp
 import time
 import logging
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
+import tracing.nlp as nlp
 from tracing.selenium_utils.common import *
 from tracing.selenium_utils.controls import *
 
@@ -30,7 +30,6 @@ def get_label_text_with_attribute(driver, elem):
         label_text = ""
 
     return label_text
-
 
 def find_radio_or_checkbox_buttons(driver,
                                   contains=None,

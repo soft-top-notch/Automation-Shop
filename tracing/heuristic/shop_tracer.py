@@ -26,8 +26,12 @@ class States:
     new = "new"
     shop = "shop"
     product_page = "product_page"
+    found_product_page = "found_product_page"
+    found_product_in_cart = "found_product_in_cart"
     product_in_cart = "product_in_cart"
     cart_page = "cart_page"
+    cart_page_2 = "cart_page_2"
+    cart_page_3 = "cart_page_3"
     checkout_page = "checkout_page"
     payment_page = "payment_page"
     purchased = "purchased"
@@ -39,7 +43,9 @@ class States:
     pay = "pay"
 
     states = [
-        new, shop, product_page, product_in_cart, cart_page,
+        new, shop, product_page, found_product_page,
+        product_in_cart, found_product_in_cart,
+        cart_page, cart_page_2, cart_page_3,
         checkout_page, checkoutLoginPage, fillCheckoutPage,
         prePaymentFillingPage, fillPaymentPage, pay, purchased
     ]
@@ -107,6 +113,10 @@ class IEnvActor:
         raise NotImplementedError
 
     @abstractmethod
+    def reset(self):
+        pass
+
+    @abstractmethod
     def filter_page(self, driver, state, context):
         return True
 
@@ -138,6 +148,10 @@ class ISiteActor:
 
     @abstractmethod
     def __init__(self):
+        pass
+
+    @abstractmethod
+    def reset(self):
         pass
 
     @abstractmethod
@@ -289,6 +303,9 @@ class ShopTracer:
                 new_state, discard = actor.get_state_after_action(is_success, state, ctrl, self.environment)
                 self.on_after_action(action, is_success and not discard, new_state=new_state)
 
+                if not isinstance(action, Nothing):
+                    self._logger.info('is_success: {}, discard: {}'.format(is_success, discard))
+
                 # Discard last action
                 if discard:
                     self.environment.discard()
@@ -308,6 +325,7 @@ class ShopTracer:
 
         self._logger.info('processing state: {}'.format(state))
         for priority, handler in handlers:
+            handler.reset()
             self.environment.reset_control()
             self._logger.info('handler {}'.format(handler))
             new_state = self.apply_actor(handler, state)
@@ -318,7 +336,6 @@ class ShopTracer:
             if new_state != state:
                 return new_state
         return state
-
 
     def trace(self, domain, wait_response_seconds = 60, attempts = 3, delaying_time = 10):
         """

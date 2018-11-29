@@ -148,7 +148,6 @@ class InputBYear(InputBirthday):
         return ["day", "month", "input day", "input month", "dd", "mm", "email", "input email"]
 
 
-
 class InputEmail(IAction):
     def is_applicable(self, ctrl):
         if ctrl.type != Types.text:
@@ -159,7 +158,7 @@ class InputEmail(IAction):
             return True
 
         ctrl_label = ctrl_label.strip().lower()
-        if ctrl_label in ['dd', 'mm', 'yyyy', 'day', 'month', 'year', 'log in', 'login']:
+        if ctrl_label in ['dd', 'mm', 'yyyy', 'day', 'month', 'year']:
             return False
 
         for not_contains in ['phone', 'search', 'first name', 'last name']:
@@ -168,7 +167,6 @@ class InputEmail(IAction):
 
         return True
 
-        
     def apply(self, ctrl, driver, user):
         if self.is_applicable(ctrl):
             email = user[0].email
@@ -353,6 +351,7 @@ class Click(IAction):
         if self.is_applicable(ctrl):
             click(driver, ctrl.elem)
             time.sleep(5)
+
             return True
         
         return False
@@ -477,6 +476,52 @@ class SearchProductPage(ISiteAction):
         return False
 
 
+class InputPassword(IAction):
+    def apply(self, control, driver, user):
+        if not self.is_applicable(control):
+            return False
+
+        # Generate password that secure
+        text = str(uuid.uuid4())[0:4].upper() + '_' + '912' + str(uuid.uuid4())[:4].lower()
+        enter_text(control.elem, text)
+        time.sleep(1)
+
+        return True
+
+    def is_applicable(self, control):
+        if control.type not in [Types.text]:
+            return False
+
+        label = (control.label or '').strip().lower()
+        if label:
+            return label.find('password') >= 0
+
+        return True
+
+
+class SelectFirst(IAction):
+    def apply(self, control, driver, user):
+        if not self.is_applicable(control):
+            return False
+
+        values = control.values
+        if len(values) == 0:
+            return False
+
+        if len(values) == 1:
+            val = values[0]
+        else:
+            val = values[1]
+
+        select_combobox_value(driver, control.elem, val)
+        time.sleep(1)
+
+        return True
+
+    def is_applicable(self, control):
+        return control.type in [Types.select]
+
+
 class Actions:
     actions = [
         InputBDay(),
@@ -488,4 +533,11 @@ class Actions:
         InputEmail(),
         Nothing()
     ]
+
+    # Actions that are used to close Popups
+    popups = [InputBDay(), InputBMonth(), InputBYear(), Click(), InputEmail(), Nothing()]
+
+    # Actions that are used for navigation to Checkout Page
+    # ToDo Login??
+    navigation = [Click(), InputEmail(), InputPassword(), SelectFirst(), Nothing()]
 
