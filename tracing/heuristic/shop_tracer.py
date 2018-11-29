@@ -277,8 +277,9 @@ class ShopTracer:
                 ctrl = self.environment.get_next_control()
                 self.on_before_action(ctrl, state = state)
                 action = actor.get_action(ctrl)
-
-                if not isinstance(action, Nothing):
+                if isinstance(action, Nothing):
+                    continue
+                else:
                     self._logger.info(ctrl)
                     self._logger.info(action)
                     self.environment.save_state()

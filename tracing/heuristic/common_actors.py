@@ -7,7 +7,7 @@ import sys
 
 from tracing.nlp import *
 from tracing.common_heuristics import *
-
+from selenium.webdriver.support.select import Select
 import tracing.selenium_utils.common as common
 import tracing.selenium_utils.controls as controls
 from tracing.heuristic.shop_tracer import *
@@ -277,6 +277,8 @@ class CheckoutLogin(IEnvActor):
     def get_action(self, control):
         if control.type not in [controls.Types.link, controls.Types.button, controls.Types.radiobutton, controls.Types.text]:
             if control.type == controls.Types.select:
+                if (Select(control.elem).first_selected_option.text == 'United States'):
+                    return Nothing()
                 if (control.values and 'Colorado' in control.values) or \
                         (control.label and ('state' in control.label.lower() or 'province' in control.label.lower())):
                     return Nothing()
@@ -330,6 +332,8 @@ class CheckoutLogin(IEnvActor):
 
             if nlp.check_text(control.label, self.contains, self.not_contains) or \
             "place order" in control.label.lower():
+                if self.guest_found:
+                    return (States.fillCheckoutPage, False)
                 if not environment.has_next_control():
                     # environment.refetch_controls()
                     return (States.fillCheckoutPage, False)
@@ -347,8 +351,8 @@ class FillingCheckoutPage(IEnvActor):
         controls.Types.text, controls.Types.select, controls.Types.button, 
         controls.Types.link, controls.Types.radiobutton, controls.Types.checkbox
     ]
-    contains = ['continue', 'payment', 'proceed', 'bill & ship']
-    not_contains = ['amazon', 'paypal', 'giftcode', 'machine', 'cards']
+    contains = ['continue', 'payment', 'proceed', 'bill & ship', 'place order']
+    not_contains = ['amazon', 'paypal', 'giftcode', 'machine', 'cards', 'gift']
 
     def __init__(self):
         self.state_control = None
@@ -396,6 +400,8 @@ class FillingCheckoutPage(IEnvActor):
                 # return InputSelectField('select-state-name')
                 self.state_control = control
                 return Nothing()
+            if (Select(control.elem).first_selected_option.text == 'United States'):
+                self.country_found = True
             elif 'United States of America' in control.values:
                 self.country_found = True
                 return InputSelectField('select-country-full')
@@ -420,7 +426,7 @@ class FillingCheckoutPage(IEnvActor):
                 if 'giftcode' in text.lower():
                     return Nothing()
                 return Click()
-            if (control.label and nlp.check_text(control.label.lower(), ['credit'], ['amazon', 'paypal', 'machine', 'cards'])):
+            if (control.label and nlp.check_text(control.label.lower(), ['credit'], ['amazon', 'paypal', 'machine', 'cards', 'gift'])):
                 return Click()
             return Nothing()
         else:
@@ -440,6 +446,12 @@ class FillingCheckoutPage(IEnvActor):
                 return (States.fillPaymentPage, False)
 
             if control.label and nlp.check_text(control.label.lower(), self.contains, self.not_contains):
+                if not self.country_found:
+                    Select(environment.driver.find_element_by_class_name('country_to_state')).select_by_value("US")
+                if not self.state_control:
+                    Select(environment.driver.find_element_by_id('billing_state')).select_by_value(environment.context.user_info.state)
+                if 'place order' in control.label.lower():
+                    return (States.fillPaymentPage, False)                
                 return (States.prePaymentFillingPage, False)
         except Exception as e:
             pass
@@ -450,11 +462,13 @@ class PrePaymentFillingPage(IEnvActor):
     type_list = [
         controls.Types.radiobutton,
         controls.Types.link,
-        controls.Types.button
+        controls.Types.button,
+        controls.Types.checkbox
     ]
     contains = ['continue', 'proceed', 'ahead']
     not_contains = [
-        'login', 'signin', 'log-in', 'sign-in', 'register', 'continue shopping'
+        'login', 'signin', 'log-in', 'sign-in',
+        'register','continue shopping', 'machine', 'cards'
     ]
 
     def __init__(self):
@@ -501,7 +515,7 @@ class FillingPaymentPage(IEnvActor):
         controls.Types.text, controls.Types.select, 
         controls.Types.radiobutton, controls.Types.checkbox
     ]
-    contains = ['card type', 'credit-type', 'cctype']
+    contains = ['card type', 'credit-type', 'cctype', 'creditcardtype']
     not_contains = ['sign-in', 'continue shopping']
 
     def __init__(self):
@@ -538,19 +552,20 @@ class FillingPaymentPage(IEnvActor):
         if control.type == controls.Types.text:
 
             card_number_text = [
-                'cc-number', 'cc_number', 'cc number', 
-                'card number', 'card-number', 'card_number', 'ccno'
+                'cc-number', 'cc_number', 'cc number', 'card number',
+                'card-number', 'card_number','ccno', 'creditcardnumber'
             ]
             if nlp.check_text(text.lower(), card_number_text, ['sign-in']):
                 self.card_number_filled = True
                 self.has_card_details = True
                 return InputPaymentTextField('card-number')
-            elif (control.label and nlp.check_text(control.label.lower(), ['name on card'], ['card-number'])):
+            elif (control.label and nlp.check_text(control.label.lower(), ['name on card', 'card-holder'], ['card-number'])) or \
+                nlp.check_text(text.lower(), ['name on card', 'holdersname', 'card-holder'], ['card-number']):
                 return InputCheckoutFields("first_name")
             elif (control.label and nlp.check_text(control.label.lower(), ['verification', 'cvc', 'cvv', 'cccvd'], ['card-number'])) or nlp.check_text(text.lower(), ['verification', 'cvc', 'cvv', 'cccvd'], ['card-number']):
                 self.card_cvc_filled = True
                 return InputPaymentTextField('cvc')
-            elif (control.label and ('mm' in control.label.lower() and 'yy' in control.label.lower())) or ('month' in text.lower() and 'year' in text.lower()) or ('mm' in text.lower() and 'yy' in text.lower()):
+            elif (control.label and ('mm' in control.label.lower() and 'yy' in control.label.lower())) or ('month' in text.lower() and 'year' in text.lower()) or ('mm' in text.lower() and 'yy' in text.lower()) or ('creditcardexp' in text.lower()):
                 self.card_month_filled = True
                 self.card_year_filled = True
                 return InputPaymentTextField('input-card-month-year')
@@ -567,7 +582,11 @@ class FillingPaymentPage(IEnvActor):
         elif control.type == controls.Types.select:
             if nlp.check_text(text.lower(), self.contains, ['credit-card-number'])\
                     or control.label and nlp.check_text(control.label.lower(), self.contains, ['credit-card-number']):
-                return InputSelectField('card-type')
+                if 'Credit card' in control.values:
+                    Select(control.elem).select_by_visible_text("Credit card")
+                    return Nothing()
+                else:
+                    return InputSelectField('card-type')
             elif nlp.check_text(text.lower(), ['expiration', 'expire', 'year', 'month', 'ccexpm', 'ccexpy'], ['credit-card-number']):
                 if nlp.check_text(text.lower(), ['month', 'mm', 'ccexpm'], ['year']):
                     self.card_month_filled = True
@@ -609,9 +628,11 @@ class FillingPaymentPage(IEnvActor):
 
             return Nothing()
         elif control.type in [controls.Types.button, controls.Types.link]:
-            sub_contains = ['place order', 'continue', 'proceed', 'payment','pay for order']
-            sub_not_contains = ['sign-in', 'continue shopping', 'paypal', 'cheque', 'moneyorder', 'gift', 'machine']
+            sub_contains = ['place order', 'continue', 'proceed', 'payment','pay for order', 'submit my order']
+            sub_not_contains = ['sign-in', 'continue shopping', 'paypal', 'cheque', 'moneyorder', 'gift', 'machine', 'masterpass']
             if (control.label and nlp.check_text(control.label.lower(), sub_contains, sub_not_contains)) or nlp.check_text(text.lower(), sub_contains, sub_not_contains):
+                if 'giftcode' in text.lower():
+                    return Nothing()
                 if self.get_filling_status():
                     return Click()
                 elif not self.has_card_details:
@@ -645,8 +666,12 @@ class FillingPaymentPage(IEnvActor):
                         environment.reset_control()
                 else:
                     pass
-            elif control.label and nlp.check_text(control.label.lower(), ['place order', 'pay for order'], self.not_contains):
-                return (States.purchased, False)
+            elif control.label and nlp.check_text(control.label.lower(), ['place order', 'pay for order', 'complete order'], self.not_contains):
+                if self.get_filling_status():
+                    return (States.purchased, False)
+                else:
+                    if not self.has_card_details:
+                        environment.refetch_controls()
             elif control.label and nlp.check_text(control.label.lower(), ['continue', 'order'], self.not_contains):
                 text = control.elem.get_attribute('outerHTML')
                 if 'credit card' in text.lower():

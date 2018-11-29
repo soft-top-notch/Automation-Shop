@@ -1,12 +1,13 @@
 import random
+import nlp
+import time
+import logging
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
 from tracing.selenium_utils.common import *
 from tracing.selenium_utils.controls import *
-import tracing.nlp as nlp
-
 
 
 def get_label_text_with_attribute(driver, elem):
