@@ -1,12 +1,13 @@
 import random
+import time
+import logging
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.action_chains import ActionChains
 
+import tracing.nlp as nlp
 from tracing.selenium_utils.common import *
 from tracing.selenium_utils.controls import *
-import tracing.nlp as nlp
-
 
 
 def get_label_text_with_attribute(driver, elem):
@@ -29,7 +30,6 @@ def get_label_text_with_attribute(driver, elem):
         label_text = ""
 
     return label_text
-
 
 def find_radio_or_checkbox_buttons(driver,
                                   contains=None,
@@ -255,3 +255,8 @@ def is_domain_for_sale(driver, domain):
     text = get_page_text(driver)
     return nlp.check_if_domain_for_sale(text, domain)
 
+
+def search_for_add_to_cart(driver):
+    contains = ["addtocart", "addtobag", "add to cart", "add to bag"]
+    not_contains = ["where", "about us"]
+    return find_buttons_or_links(driver, contains, not_contains)

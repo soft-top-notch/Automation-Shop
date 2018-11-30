@@ -7,7 +7,7 @@ import os
 from PIL import Image
 import time
 
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, UnexpectedAlertPresentException
 from selenium.webdriver.support.expected_conditions import *
 from selenium.webdriver.common.alert import *
 from selenium.common.exceptions import UnexpectedAlertPresentException
@@ -131,13 +131,9 @@ def to_string(element):
 
     
 def get_page_text(driver):
-    html = driver.page_source
-    soup = BeautifulSoup(html, 'lxml')
-    
-    for script in soup(["script", "style", "img", "input"]):
-        script.decompose()
-    
-    return soup.get_text()
+
+    body = driver.find_element_by_tag_name('body')
+    return body.get_attribute('innerText')
 
             
 def count_tabs(driver):

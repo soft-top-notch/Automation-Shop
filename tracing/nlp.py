@@ -38,6 +38,42 @@ def check_text(text, contains, not_contains=None, normalize=True):
     return not has_forbidden
 
 
+def check_text_with_label(value, contains, not_contains=None, normalize=True):
+    text = value[0]
+    label = value[1]
+
+    if not contains:
+        contains = []
+
+    if not not_contains:
+        not_contains = []
+
+    if normalize:
+        text = normalize_text(text)
+
+    has_searched = False
+    for str in contains:
+        print (text, label)
+        print (re.search(str, text), re.search(str, label), "............", str)
+        if re.search(str, text):
+            has_searched = True
+            break
+        elif re.search(str, label):
+            has_searched = True
+            break
+
+    if not has_searched and len(contains) > 0:
+        return False
+
+    has_forbidden = False
+    for str in not_contains:
+        if re.search(str, text):
+            has_forbidden = True
+            break
+
+    return not has_forbidden
+
+
 def remove_letters(text, contains):
     strName = text
     for elem in contains:
@@ -46,13 +82,14 @@ def remove_letters(text, contains):
 
 
 def check_if_empty_cart(text):
-    contains = ['(cart|bag) is empty',
+    contains = ['(cart|bag) (\w+ |)is empty',
+                '(cart|bag) is (\w+ |)empty',
             'zero (products|items|tickets) in (cart|bag)',
             'zero (products|items|tickets) in .\w* (cart|bag)',
             'no (products|items|tickets) in (cart|bag)',
             'no (products|items|tickets) in .\w* (cart|bag)'
            ]
-    
+
     return check_text(text, contains, [])
 
 

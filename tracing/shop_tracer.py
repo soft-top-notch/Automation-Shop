@@ -221,7 +221,6 @@ class ShopTracer:
     def trace(self, domain, wait_response_seconds = 60, attempts = 3, delaying_time = 10):
         """
         Traces shop
-
         :param domain:                 Shop domain to trace
         :param wait_response_seconds:  Seconds to wait response from shop
         :param attempts:               Number of attempts to navigate to checkout page

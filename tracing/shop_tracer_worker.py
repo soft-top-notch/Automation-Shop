@@ -59,7 +59,7 @@ if "MONGO_HOST" not in os.environ:
     os.environ["MONGO_HOST"] = "localhost"
 
 
-config = configparser.SafeConfigParser(os.environ)
+config = configparser.ConfigParser(os.environ)
 config.read('config.ini')
 
 # Number of threads

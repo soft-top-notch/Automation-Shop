@@ -3,28 +3,34 @@ import csv
 import logging
 import sys
 
-sys.path.insert(0, '../tracing')
+from tracing.rl.environment import Environment
+from tracing.heuristic.shop_tracer import ShopTracer
 
-import common_actors
-import user_data
+import random
+import csv
+import logging
+import sys
 
-from tracing.selenium_utils.common import *
-from tracing.selenium_utils.controls import *
-from trace_logger import *
+import tracing.heuristic.common_actors as common_actors
+from tracing.rl.environment import *
+from tracing.heuristic.shop_tracer import *
+from tracing.trace_logger import *
 from datetime import datetime
-from shop_tracer import *
 from contextlib import contextmanager
+
 
 @contextmanager
 def get_tracer(headless=False):
-    tracer = ShopTracer(user_data.get_user_data, headless=headless)
+    env = Environment(headless=headless, max_passes=10)
+    tracer = ShopTracer(environment = env)
     common_actors.add_tracer_extensions(tracer)
 
     yield tracer
 
+
 logger = logging.getLogger('shop_tracer')
 logger.propagate = False
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -51,13 +57,15 @@ with get_tracer(headless=False) as tracer:
     for index, url in enumerate(test_urls):
         print('\n\nstarted url: {}'.format(url))
         old_time = datetime.now()
-        status = tracer.trace(url, 60, attempts=3, delaying_time=2)
+        status = tracer.trace(url, 60, attempts=1, delaying_time=2)
         new_time = datetime.now()
 
         if status.state == States.purchased:
-            logger.warning("\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Exactly purchased! Success!-----"))
+            logger.warning("\n\nfinished url: {}, status: {}, state: {}"
+                           .format(url, status, "-----Exactly purchased! Success!-----"))
         else:
-            warnning_text = "\n\nfinished url: {}, status: {}, state: {}".format(url, status, "-----Can't purchase! Failed!-----")
+            warnning_text = "\n\nfinished url: {}, status: {}, state: {}"\
+                .format(url, status, "-----Can't purchase! Failed!-----")
             logger.warning(warnning_text)
             results.append(warnning_text)
         logger.warning("\n\n-------Execute time: {} minutes-------".format(int((new_time - old_time).total_seconds() / 60.0)))

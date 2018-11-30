@@ -9,10 +9,8 @@ import numpy as np
 
 
 class A3CModel:
-    global_scope = "global_model_scope"
-    local_scope = "local_model_scope"
-    
-    def __init__(self, num_actions, 
+
+    def __init__(self, num_actions,
                  session = None,
                  train_deep = True,
                  rnn_size = 100,

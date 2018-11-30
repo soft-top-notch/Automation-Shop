@@ -2,13 +2,11 @@ import tensorflow as tf
 
 import os
 import random
-import sys
 from tracing.utils.downloader import Downloader
 
-sys.path.append('..')
-from navigation.create_dataset import CheckoutsDataset
-from popups.create_dataset import PopupsDataset
-from page_classifier import PageClassifier
+from tracing.training.navigation.create_dataset import CheckoutsDataset
+from tracing.training.popups.create_dataset import PopupsDataset
+from tracing.training.classification.page_classifier import PageClassifier
 
 
 random.seed(0)

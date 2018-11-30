@@ -1,4 +1,5 @@
 from PIL import Image
+import PIL
 import numpy as np
 
 class ImageHelper:
@@ -44,3 +45,16 @@ class ImageHelper:
                 imgs[i] = img[:max_h, :, :]
 
         return imgs
+
+
+    def input2img(self, img, file):
+        """
+        Converts numpy input to image
+        :param img: 3D numpy array [width, height, 3] every value should be from -1.0 to 1.0
+        :param file: File to save image
+        """
+
+        rgb = (img * 128 + 128).astype(np.uint8)
+        img = PIL.Image.fromarray(rgb, 'RGB')
+        img.save(file)
+

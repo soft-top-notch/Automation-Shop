@@ -34,7 +34,7 @@ class ToProductPageLink(IStepActor):
     def process_links(driver, state, links):
         if not links:
             return state
-        
+
         attempts = 3
         links = list(links)
         random.shuffle(links)
@@ -48,7 +48,7 @@ class ToProductPageLink(IStepActor):
             url = ShopTracer.normalize_url(link)
             driver.get(url)
             time.sleep(3)
-            
+
             # Check that have add to cart buttons
             if AddToCart.find_to_cart_elements(driver):
                 return States.product_page
@@ -56,23 +56,23 @@ class ToProductPageLink(IStepActor):
                 back(driver)
 
         return state
-    
+
     def process_page(self, driver, state, context):
         links = list([link.get_attribute('href') for link in ToProductPageLink.find_to_product_links(driver)])
         return ToProductPageLink.process_links(driver, state, links)
 
-    
+
 class AddToCart(IStepActor):
     def get_states(self):
         return [States.new, States.shop, States.product_page]
 
     @staticmethod
     def find_to_cart_elements(driver):
-        return find_buttons_or_links(driver, ["addtocart", 
-                                              "addtobag", 
+        return find_buttons_or_links(driver, ["addtocart",
+                                              "addtobag",
                                               "add to cart",
                                               "add to bag"], ['where'])
-        
+
     def process_page(self, driver, state, context):
         elements = AddToCart.find_to_cart_elements(driver)
 
@@ -101,15 +101,15 @@ class ToShopLink(IStepActor):
 class ClosePopups(IStepActor):
     def get_states(self):
         return [States.new]
-    
+
     def process_page(self, driver, state, context):
         if try_handle_popups(driver):
             logger = logging.getLogger("shop_tracer")
             logger.info("Popup closed")
 
         return state
-        
-        
+
+
 class ToCartLink(IStepActor):
     def find_to_cart_links(self, driver):
         return find_links(driver, ["cart"], ['add', 'append'])
@@ -162,13 +162,13 @@ class ToCheckout(IStepActor):
     def get_states(self):
         return [States.product_in_cart, States.cart_page]
 
-    
+
     @staticmethod
     def has_checkout_btns(driver):
         btns = ToCheckout.find_checkout_elements(driver)
         return len(btns) > 0
 
-    
+
     @staticmethod
     def process(driver, state, max_depth=3):
         btns = ToCheckout.find_checkout_elements(driver)
@@ -177,13 +177,13 @@ class ToCheckout(IStepActor):
             time.sleep(3)
             close_alert_if_appeared(driver)
             if not is_empty_cart(driver):
-                if ToCheckout.has_checkout_btns(driver) and max_depth > 0:                    
+                if ToCheckout.has_checkout_btns(driver) and max_depth > 0:
                     ToCheckout.process(driver, state, max_depth - 1)
 
                 return States.checkout_page
 
         return state
-    
+
     def process_page(self, driver, state, context):
         return ToCheckout.process(driver, state)
 
@@ -206,21 +206,22 @@ class PaymentFields(IStepActor):
                 radio_or_check_continue = find_radio_or_checkbox_buttons(
                     driver,
                     ["guest", "create*.*later", "copy*.*ship",
-                    "copy*.*bill", "skip*.*login", "register"]
+                     "copy*.*bill", "skip*.*login", "register"]
                 )
                 if not radio_or_check_continue and \
-                    not self.find_guest_continue_button(
-                        driver,
-                        ["continue", "checkout", "check out",
-                        "(\s|^)go(\s|$)","new.*.customer"],
-                        ["login", "continue shopping", "cart",
-                        "logo", "return", "signin"]
-                    ):
+                        not self.find_guest_continue_button(
+                            driver,
+                            ["continue", "checkout", "check out",
+                             "(\s|^)go(\s|$)","new.*.customer"],
+                            ["login", "continue shopping", "cart",
+                             "logo", "return", "signin"]
+                        ):
                     if not self.new_account_field_exist(driver,
-                        ["guest", "(no|without|free|create).*account",
-                        "account.*.(no|without|free)"],
-                        ["login","signin","sign in"],
-                        password_fields[0]):
+                                                        ["guest", "(no|without|free|create).*account",
+                                                         "account.*.(no|without|free)"],
+                                                        ["login","signin","sign in"],
+                                                        password_fields[0]):
+
                         logger.debug("We can't use this url! Login password required!")
                         return False
         return True
@@ -267,19 +268,19 @@ class PaymentFields(IStepActor):
 
     def find_guest_continue_button(self, driver, contains, not_contains):
         '''
-            Find guest or continue button in case the password input field exist in checkout page 
+            Find guest or continue button in case the password input field exist in checkout page
         '''
         pass_button = []
 
         text_element = find_text_element(
             driver,
             ["guest", "(no|without|free|create).*account",
-            "account.*.(no|without|free)"])
+             "account.*.(no|without|free)"])
 
         if text_element:
             for button in find_buttons_or_links(driver, contains, not_contains):
                 if button.get_attribute("href") and \
-                    button.get_attribute("href") in normalize_url(get_url(driver)):
+                        button.get_attribute("href") in normalize_url(get_url(driver)):
                     continue
                 pass_button.append(button)
 
@@ -310,64 +311,64 @@ class PaymentFields(IStepActor):
 
 
     def process_select_option(self, driver, contains, context):
-            '''
-                Find select elements containing content of contains parameter
-                and choose exact option with context
-            '''
-            result_cnt = 0
+        '''
+            Find select elements containing content of contains parameter
+            and choose exact option with context
+        '''
+        result_cnt = 0
 
-            for item in contains:
-                selects = self.find_select_element(driver, item, ['ex1', 'ex'])
-                if not selects:
+        for item in contains:
+            selects = self.find_select_element(driver, item, ['ex1', 'ex'])
+            if not selects:
+                continue
+            for sel in selects:
+                try:
+                    flag = False
+                    for option in sel.find_elements_by_css_selector("option"):
+                        text = option.text + " " + option.get_attribute("innerHTML").strip()
+                        ctns  = []
+
+                        if item == "country":
+                            ctns = ["united states"]
+                        elif item == "day":
+                            ctns = ["27"]
+                        elif item == "state":
+                            ctns = [
+                                nlp.normalize_text(get_name_of_state(context.user_info.state)),
+                                "(^|\s){}$".format(nlp.normalize_text(context.user_info.state))
+                            ]
+                        else:
+                            ctns = [
+                                nlp.normalize_text(context.payment_info.card_type),
+                                "(\d\d|^){}$".format(context.payment_info.expire_date_year),
+                                "(^|-|_|\s|\d){}".format(nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)])),
+                                context.payment_info.expire_date_month
+                            ]
+                        if nlp.check_text(text, ctns):
+                            try:
+                                option.click() # select() in earlier versions of webdriver
+                                time.sleep(context.delaying_time - 1)
+                                result_cnt += 1
+                                flag = True
+                                break
+                            except:
+                                break
+                    if flag:
+                        break
+                except:
                     continue
-                for sel in selects:
-                    try:
-                        flag = False
-                        for option in sel.find_elements_by_css_selector("option"):
-                            text = option.text + " " + option.get_attribute("innerHTML").strip()
-                            ctns  = []
-
-                            if item == "country":
-                                ctns = ["united states"]
-                            elif item == "day":
-                                ctns = ["27"]
-                            elif item == "state":
-                                ctns = [
-                                    nlp.normalize_text(get_name_of_state(context.user_info.state)),
-                                    "(^|\s){}$".format(nlp.normalize_text(context.user_info.state))
-                                ]
-                            else:
-                                ctns = [
-                                    nlp.normalize_text(context.payment_info.card_type),
-                                    "(\d\d|^){}$".format(context.payment_info.expire_date_year),
-                                    "(^|-|_|\s|\d){}".format(nlp.normalize_text(calendar.month_abbr[int(context.payment_info.expire_date_month)])),
-                                    context.payment_info.expire_date_month
-                                ]
-                            if nlp.check_text(text, ctns):
-                                try:
-                                    option.click() # select() in earlier versions of webdriver
-                                    time.sleep(context.delaying_time - 1)
-                                    result_cnt += 1
-                                    flag = True
-                                    break
-                                except:
-                                    break
-                        if flag:
-                            break
-                    except:
-                        continue
-            return result_cnt
+        return result_cnt
 
 
     def input_fields_in_checkout(self,
-                                driver,
-                                context,
-                                select_contains,
-                                extra_contains,
-                                is_userInfo=True,
-                                not_extra_contains=None,
-                                not_contains=None
-                                ):
+                                 driver,
+                                 context,
+                                 select_contains,
+                                 extra_contains,
+                                 is_userInfo=True,
+                                 not_extra_contains=None,
+                                 not_contains=None
+                                 ):
         '''
             Choose select option and fill input fields.
             select_contains:
@@ -406,8 +407,8 @@ class PaymentFields(IStepActor):
             label_text = ""
             try:
                 if input_texts[index].is_displayed() and \
-                    not nlp.check_text(input_texts[index].get_attribute("type"),
-                    ["button", "submit", "radio", "checkbox", "image"]):
+                        not nlp.check_text(input_texts[index].get_attribute("type"),
+                                           ["button", "submit", "radio", "checkbox", "image"]):
                     label_text = get_label_text_with_attribute(driver, input_texts[index])
 
                 if not label_text:
@@ -508,20 +509,20 @@ class PaymentFields(IStepActor):
 
         if error_elements:
             if len(error_elements) == 1 and nlp.check_text(
-                error_elements[0].get_attribute("outerHTML"),
-                ["credit", "merchant", "payment", "security","transaction", "decline", "permit", "authenticat"],
-                ["find", "require"]):
+                    error_elements[0].get_attribute("outerHTML"),
+                    ["credit", "merchant", "payment", "security","transaction", "decline", "permit", "authenticat"],
+                    ["find", "require"]):
                 return 2
             elif len(error_elements) == 2 and nlp.check_text(error_elements[1].get_attribute("outerHTML"), ["password"]):
                 return 1
-            
+
             if len(error_elements) <= 3:
                 for error in error_elements:
                     if nlp.check_text(
-                        error.get_attribute("outerHTML"),
-                        ["already have an account with this email address",
-                        "couldn't be verified",
-                        "inactive for a while"]):
+                            error.get_attribute("outerHTML"),
+                            ["already have an account with this email address",
+                             "couldn't be verified",
+                             "inactive for a while"]):
                         return 2
 
             while True:
@@ -535,8 +536,8 @@ class PaymentFields(IStepActor):
                                     error_result.append(label_text + " field required")
                         if not error_result:
                             contain = ["password", "company", "first", "last", "address",
-                                        "street", "city", "state", "zip", "phone",
-                                        "email", "town", "cvc", "ccv", "credit"]
+                                       "street", "city", "state", "zip", "phone",
+                                       "email", "town", "cvc", "ccv", "credit"]
                             for item in contain:
                                 not_contains = []
                                 contains = [item]
@@ -630,9 +631,9 @@ class PaymentFields(IStepActor):
         agree_btns = find_radio_or_checkbox_buttons(
             driver,
             ["agree", "terms","same", "copy",
-            "different", "register", "remember", "keep", "credit",
-            "stripe", "mr", "standard", "free", "deliver",
-            "billing_to_show", "ground", "idt", "gender"],
+             "different", "register", "remember", "keep", "credit",
+             "stripe", "mr", "standard", "free", "deliver",
+             "billing_to_show", "ground", "idt", "gender"],
             ["express"]
         )
         cycle_count = 0
@@ -650,9 +651,9 @@ class PaymentFields(IStepActor):
                     agree_btns = find_radio_or_checkbox_buttons(
                         driver,
                         ["agree", "terms", "same", "copy",
-                        "different", "remember", "keep", "credit", "stripe",
-                        "register", "mr", "standard", "free", "deliver",
-                        "billing_to_show", "ground", "idt", "gender"],
+                         "different", "remember", "keep", "credit", "stripe",
+                         "register", "mr", "standard", "free", "deliver",
+                         "billing_to_show", "ground", "idt", "gender"],
                         ["express"]
                     )
                     cycle_count += 1
@@ -791,9 +792,9 @@ class PaymentFields(IStepActor):
                 first_agree = True
 
             if not is_userinfo and self.fill_billing_address(driver, context):
-                    is_userinfo = True
-                    context.log_step("Fill user information fields")
-                    time.sleep(context.delaying_time - 1)
+                is_userinfo = True
+                context.log_step("Fill user information fields")
+                time.sleep(context.delaying_time - 1)
 
             div_btns = find_elements_with_attribute(driver, "div", "class", "shipping_method")
 
@@ -814,18 +815,18 @@ class PaymentFields(IStepActor):
                 driver,
                 ["order", "pay", "checkout", "payment", "buy"],
                 ["add", "modify", "coupon", "express",
-                "continu", "border", "proceed", "review",
-                "guest", "complete", "detail", "\.paypal\.",
-                "currency", "histor", "amazon", "summary toggle"], 2
+                 "continu", "border", "proceed", "review",
+                 "guest", "complete", "detail", "\.paypal\.",
+                 "currency", "histor", "amazon", "summary toggle"], 2
             )
 
             if order:
                 break
 
             continue_btns = get_no_href_buttons(driver,
-                ["continu", "next", "proceed", "complete"],
-                ["login", "cancel"]
-            )
+                                                ["continu", "next", "proceed", "complete"],
+                                                ["login", "cancel"]
+                                                )
             flag = False
 
             if continue_btns:
@@ -838,7 +839,7 @@ class PaymentFields(IStepActor):
                 continue_btns = get_no_href_buttons(
                     driver,
                     ["bill", "proceed", "(\s|^)pay", "submit", "create*.*account",
-                    "add", "save", "select shipping option"],
+                     "add", "save", "select shipping option"],
                     ["modify", "express", "cancel", "login", "sign in"]
                 )
 
@@ -881,7 +882,7 @@ class PaymentFields(IStepActor):
             elif allow_number == 3:
                 is_userinfo = False
                 allow_fill_payment = True
-            
+
             if allow_number != 3 and allow_number != 2:
                 page_text = get_page_text(driver)
 
@@ -922,7 +923,7 @@ class PaymentFields(IStepActor):
             for _ in range(0, 3):
                 pay_buttons = []
                 if not self.fill_payment_info(driver, context) \
-                    and not self.check_iframe_and_fill(driver, context):
+                        and not self.check_iframe_and_fill(driver, context):
                     logging.debug("Payment information is already inputed or payment field not exist!")
                 else:
                     is_paymentinfo = True
@@ -935,14 +936,15 @@ class PaymentFields(IStepActor):
                     if not simply_click_one_element(pay_buttons):
                         if self.click_continue_in_iframe(driver):
                             return_flag = True
-                            continue                        
+                            continue
                         logging.debug("Pay or order button error!")
                         return_flag = False
                     else:
                         if not self.click_continue_in_iframe(driver):
                             return_flag = False
                         else:
-                            return_flag = True                        
+                            return_flag = True
+
                         time.sleep(context.delaying_time - 1)
                 else:
                     return_flag = False
@@ -962,7 +964,7 @@ class PaymentFields(IStepActor):
         radio_pass = find_radio_or_checkbox_buttons(
             driver,
             ["guest", "create*.*later", "copy*.*ship",
-            "copy*.*bill", "skip*.*login", "register"]
+             "copy*.*bill", "skip*.*login", "register"]
         )
 
         if radio_pass:
@@ -974,9 +976,9 @@ class PaymentFields(IStepActor):
         continue_pass = self.find_guest_continue_button(
             driver,
             ["continue", "checkout", "check out",
-            "(\s|^)go(\s|$)","new.*.customer"],
+             "(\s|^)go(\s|$)","new.*.customer"],
             ["login", "continue shopping", "cart",
-            "logo", "return", "signin"]
+             "logo", "return", "signin"]
         )
 
         if continue_pass:
@@ -1006,12 +1008,12 @@ class PaymentFields(IStepActor):
 
         return States.purchased
 
-    
+
 class SearchForProductPage(IStepActor):
 
     def get_states(self):
         return [States.new, States.shop]
-        
+
     def search_in_google(self, driver, query):
         driver.get('https://www.google.com')
         time.sleep(3)
@@ -1037,9 +1039,9 @@ class SearchForProductPage(IStepActor):
         search_input.send_keys(query)
         search_input.send_keys(Keys.ENTER)
         time.sleep(3)
-        
+
         links = driver.find_elements_by_css_selector('ol#b_results > li.b_algo > h2 > a[href]')
-        
+
         if len(links) > 0:
             return [link.get_attribute("href") for link in links]
         else:
@@ -1077,13 +1079,13 @@ class SearchForProductPage(IStepActor):
 
         if links:
             return ToProductPageLink.process_links(driver, state, links)
-        
+
         return state
 
 
 def add_tracer_extensions(tracer):
     tracer.add_handler(ClosePopups(), 5)
-    
+
     tracer.add_handler(AddToCart(), 4)
     tracer.add_handler(SearchForProductPage(), 1)
     tracer.add_handler(ToProductPageLink(), 3)

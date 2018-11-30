@@ -126,12 +126,8 @@ class Control:
 
     def __eq__(self, other):
         return (
-                self.__class__ == other.__class__ and
                 self.type == other.type and
-                (self.values or []) == (other.values or []) and
-                self.location == other.location and 
-                self.size == other.size and
-                (self.label or '') ==( other.label or '')
+                self.elem == other.elem
                )
 
     @staticmethod
@@ -222,7 +218,7 @@ def scroll_to_element(driver, element):
     # location could change during scrolling do it until it fixed
     for i in range(5):
         y = element.location['y']
-        scroll_to(driver, max(0, y - 200))
+        scroll_to(driver, max(0, y - 300))
         scroll = driver.execute_script('return Math.max(document.documentElement.scrollTop, document.body.scrollTop);')
         if last_scroll == scroll:
             break
@@ -253,9 +249,7 @@ def select_combobox_value(driver, element, value_text):
     """
     Selects combobox value
     :param driver:     Web driver
-    :param left:       Left coordinate of the combobox
-    :param top:        Right coordinate of the combobox
-    :param height:     Height of the combobox
+    :param element:    Html element of the combobox
     :param value_text: Text of value to select
     :return:           Weather select is success or not
     """
@@ -278,12 +272,15 @@ def click(driver, elem):
     add_scripts_if_need(driver)
     
     x, y = scroll_to_element(driver, elem)
-    height = elem.size['height']
-    width = elem.size['width']
+    elem.click()
 
-    assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+    # height = elem.size['height']
+    # width = elem.size['width']
 
-    driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
+    # assert height > 1 and width > 1, "element must have at least 2 pixels width and height"
+
+
+    # driver.execute_script('el = document.elementFromPoint({}, {}); __tra_simulateClick(el);'.format(x + width//2, y + height//2))
 
 
 def enter_text(elem, text):
@@ -425,19 +422,32 @@ def gather_click_elements(driver):
 
 
 def extract_controls(driver):
-    selects = [Control.create_select(elem) for elem in get_selects(driver)
-       if is_visible(elem)]
-    inputs = [Control.create_input(elem) for elem in get_inputs(driver) if is_visible(elem)]
-    buttons = [Control.create_button(elem) for elem in get_buttons(driver) if is_visible(elem)]
-    links = [Control.create_link(elem) for elem in get_links(driver) if is_visible(elem)]
+    select_elems = set(filter(is_visible, get_selects(driver)))
+    selects = list(map(Control.create_select, select_elems))
 
-    checkboxes = [Control.create_checkbox(elem) for elem in get_checkboxes(driver) if is_visible(elem)]
-    radios = [Control.create_radiobutton(elem) for elem in get_radiobuttons(driver) if is_visible(elem)]
+    input_elems = set(filter(is_visible, get_inputs(driver)))
+    inputs = list(map(Control.create_input, input_elems))
 
-    others = [Control.create_button(elem) for elem in gather_click_elements(driver) if is_visible(elem)]
- 
-    controls = (selects + inputs + buttons + links + checkboxes + radios + others)
-    
+    button_elems = set(filter(is_visible, get_buttons(driver)))
+    buttons = list(map(Control.create_button, button_elems))
+
+    link_elems = set(filter(is_visible, get_links(driver)))
+    links = list(map(Control.create_link, link_elems))
+
+    checkbox_elems = set(filter(is_visible, get_checkboxes(driver)))
+    checkboxes = list(map(Control.create_checkbox, checkbox_elems))
+
+    radio_elems = set(filter(is_visible, get_radiobuttons(driver)))
+    radios = list(map(Control.create_radiobutton, radio_elems))
+
+    all_elems = select_elems | input_elems | button_elems | link_elems | checkbox_elems | radio_elems
+    all_clickable = set(filter(is_visible, gather_click_elements(driver)))
+    clickable_elems = all_clickable.difference(all_elems)
+
+    clickable = list(map(Control.create_button, clickable_elems))
+
+    controls = (selects + inputs + buttons + links + checkboxes + radios + clickable)
+
     return list(set(controls))
 
 
