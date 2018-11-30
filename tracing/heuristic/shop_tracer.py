@@ -12,7 +12,7 @@ class ITraceListener:
     def on_tracing_started(self, url):
         pass
 
-    def before_action(self, environment, control = None, state = None):
+    def before_action(self, environment, control = None, state = None, handler = None, frame_idx = None):
         pass
 
     def after_action(self, action, is_success, new_state = None):
@@ -228,9 +228,9 @@ class ShopTracer:
         for listener in self.action_listeners:
             listener.on_tracing_started(url)
 
-    def on_before_action(self, control = None, state = None):
+    def on_before_action(self, control = None, state = None, handler = None):
         for listener in self.action_listeners:
-            listener.before_action(self.environment, control, state)
+            listener.before_action(self.environment, control, state, handler, self.environment.f_idx)
 
     def on_after_action(self, action, is_success, new_state = None):
         for listener in self.action_listeners:
@@ -270,7 +270,7 @@ class ShopTracer:
 
     def apply_actor(self, actor, state):
         if isinstance(actor, ISiteActor):
-            self.on_before_action(state=state)
+            self.on_before_action(state=state, handler=actor)
 
             action = actor.get_action(self.environment)
             self.environment.save_state()
@@ -289,7 +289,7 @@ class ShopTracer:
 
             while self.environment.has_next_control():
                 ctrl = self.environment.get_next_control()
-                self.on_before_action(ctrl, state = state)
+                self.on_before_action(ctrl, state = state, handler=actor)
                 action = actor.get_action(ctrl)
                 if isinstance(action, Nothing):
                     continue

@@ -299,26 +299,20 @@ class InputSelectField(IAction):
             index = months.get(user[1].expire_date_month, 0)
             month = months_text[index]
             value = "{} - {}".format(user[1].expire_date_month, month)
-            print("expire-month-text-with-number-full ---> {}".format(value))
         elif self.field == "expire-month-text-with-number-short":
             index = months.get(user[1].expire_date_month, 0)
             month = months_text[index]
             value = "{} - {}".format(str(index), month)
-            print("expire-month-text-with-number-short ---> {}".format(value))
         elif self.field == "expire-month-text-full":
             index = months.get(user[1].expire_date_month, 1)
             value = months_text[index]
-            print("expire-month-text-full ---> {}".format(value))
         elif self.field == "expire-month-text-short":
             index = months.get(user[1].expire_date_month, 1)
             value = months_text_short[index]
-            print("expire-month-text-short ---> {}".format(value))
         elif self.field == "expire-month-number-full":
             value = user[1].expire_date_month
-            print("expire-month-number-full ---> {}".format(value))
         elif self.field == "expire-month-number-short":
             value = str(months.get(user[1].expire_date_month, 0) + 1)
-            print("expire-month-number-short ---> {}".format(value))
         elif self.field == "expire-year-full":
             value = years.get(user[1].expire_date_year, '2020')
         elif self.field == "expire-year-short":

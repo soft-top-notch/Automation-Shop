@@ -51,10 +51,12 @@ class ActionsFileRecorder(ITraceListener):
         fname = str(uuid.uuid4()).replace('-', '') + '.png'
         return os.path.join(self.imgs_folder, fname)
 
-    def before_action(self, environment, control = None, state = None):
+    def before_action(self, environment, control = None, state = None, handler = None, frame_idx = None):
         self.control_file = None
         self.control_label = None
         self.possible_actions = None
+        self.handler = str(handler) if handler else None
+        self.frame_idx = frame_idx
 
         # 1. Save control image
         if control is not None:
@@ -93,7 +95,9 @@ class ActionsFileRecorder(ITraceListener):
             'possible_actions': self.possible_actions,
             'state': self.state,
             'new_state': new_state,
-            'control_label': self.control_label
+            'control_label': self.control_label,
+            'handler': self.handler,
+            'frame_idx': self.frame_idx
         }
 
         line = json.dumps(status) + '\n'
