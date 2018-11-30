@@ -118,7 +118,21 @@ Here is a rough schema of heuristic states (real is a bit harder):
 ![Heurstic states](docs/images/heuristic_states.png)
 
 See handlers are defined in tracing.common_actors.py
-
+ 
+(!) There are two heuristic based implementations:
+1. Selenium based:
+    Main implementation is:
+    - tracing/shop_tracer.py
+    - tracing/common_actors.py
+    It's main heuristic based implementation that uses Selenium directly.
+    This implementation works fast but can't be used as training for RL (Reinforcement Learning) training.
+2. Environment base:
+    Main implementation:
+    - tracing/heuristic/shop_tracer.py
+    - tracing/heuristic/common_actors.py
+    
+    This implementation works slower but could be used as training for initial policy in RL (Reinforcement Learning) training.
+ 
 ### ML processing
 
 1. Collect dataset for popups classification:
