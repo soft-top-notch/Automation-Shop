@@ -16,8 +16,8 @@ Shop Tracer do the following steps:
 
 Some parts of the solution are ML-based (and currently being built):
 - Checking if the page is a popup or a checkout page
-- Strategy to close popup
-- Strategy to navigate to Checkout Page
+- Policy to close popup
+- Policy to navigate to Checkout Page
 
 
 During tracing all traces are stored by TraceLogger. It could be FileTraceLogger and MongoDbTraceLogger.
@@ -86,7 +86,7 @@ First we need to start data service with mock user data
     (cd retrace_automation/backend; gunicorn -b 127.0.0.1:8989 r_service:api) &> mock_service.log &
     ```
 
-Then we can run shop tracing.
+Then we can run shop tracing
 
 1. Clone trace_automation repo
     ```shell
@@ -117,7 +117,7 @@ Heuristic processing is based on FSM (Final State Machine).
 Here is a rough schema of heuristic states (real is a bit harder):
 ![Heurstic states](docs/images/heuristic_states.png)
 
-See handlers are defined in tracing.common_actors.py
+Handlers are defined in tracing/common_actors.py
  
 (!) There are two heuristic based implementations:
 1. Selenium based:
@@ -125,7 +125,7 @@ See handlers are defined in tracing.common_actors.py
     - tracing/shop_tracer.py
     - tracing/common_actors.py
     It's main heuristic based implementation that uses Selenium directly.
-    This implementation works fast but can't be used as training for RL (Reinforcement Learning) training.
+    This implementation works fast but it can't be used as training for RL (Reinforcement Learning) training.
 2. Environment base:
     Main implementation:
     - tracing/heuristic/shop_tracer.py
