@@ -76,6 +76,31 @@ def find_elements_with_attribute(driver,
                                 attr_content):
     return driver.find_elements_by_css_selector("{}[{}='{}']".format(attr_tagname, attr_type, attr_content))
 
+def check_filling_fields_required (driver):
+        '''
+            Check if filling any fields is required in checkout page
+        '''
+        inputs = driver.find_elements_by_css_selector("input[type='text']")
+        inputs += driver.find_elements_by_css_selector("input[type='tel']")
+        inputs += driver.find_elements_by_css_selector("textarea")
+        user_result = False
+        payment_result = False
+
+        for element in inputs:
+            if can_click(element):
+                label_text = get_label_text_with_attribute(driver, element)
+                if not user_result and nlp.check_text(label_text, ["street", "address"], ["shipping address", "email"]):
+                    user_result = True
+                elif not payment_result and nlp.check_text(label_text, ["cardholder", "card number", "expire"]):
+                    payment_result = True
+                elif user_result and payment_result:
+                    return 3
+
+        if user_result:
+            return 1
+        elif payment_result:
+            return 2
+        return 0
 
 def find_links(driver, contains=None, not_contains=None):
     result = []

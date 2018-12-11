@@ -5,8 +5,6 @@ import requests
 import selenium
 import sys
 
-sys.path.insert(0, '..')
-
 from tracing.common_heuristics import *
 from tracing.selenium_utils.common import *
 from tracing.status import *
