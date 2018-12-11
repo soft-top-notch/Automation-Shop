@@ -62,6 +62,7 @@ The main technologies:
 5. Run Docker
     ```shell
     cd trace_automation/docker
+    sudo docker-compose build
     sudo docker-compose up
     ```
 
