@@ -2,9 +2,9 @@ import os, logging, mongoengine, time, threading, pika, configparser
 import json
 
 from tracing.shop_tracer import ShopTracer
-import tracing.trace_logger
-import tracing.common_actors
-import tracing.user_data
+import tracing.trace_logger as trace_logger
+import tracing.common_actors as common_actors
+import tracing.user_data as user_data
 
 
 class Worker(threading.Thread):
@@ -27,7 +27,7 @@ class Worker(threading.Thread):
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue = rabbitmq_queue, durable=True)
         self.channel.basic_qos(prefetch_count = 1)
-        self.channel.basic_consume(self.process_task, queue = rabbitmq_queue)        
+        self.channel.basic_consume(consumer_callback = self.process_task, queue = rabbitmq_queue)        
 
     def run(self):
         self.channel.start_consuming()

@@ -32,7 +32,7 @@ RUN pip3 install Pillow
 
 ADD . /code
 WORKDIR /code
-RUN python3 /code/setup.py install
+RUN pip3 install -I /code/
 
 CMD echo $RABBIT_HOST; echo $MONGO_HOST;xvfb-run -a python3 tracing/shop_tracer_worker.py
 
